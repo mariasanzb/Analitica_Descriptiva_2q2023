@@ -1,0 +1,535 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+# Tips basicos
+
+### Instalar paquetes e incorporarlo al entorno
+
+install.packages('{nombre del paquete}')
+library('{nombre del paquete}')
+
+### Saber el tipo de dato
+```{r}
+typeof("a")
+typeof(factor("a"))
+typeof(1)
+```
+### Filas y columnas
+
+```{r}
+iris[1,]
+iris[,1]
+```
+
+### nchar y length
+
+```{r}
+length("hola")
+#Cuenta el largo de el vector / elemento (considera la cadena como un unico elemento)
+nchar("hola")
+#Cuenta la cantidad de caracteres
+```
+
+
+# Vectores
+
+### Cosas a tener en cuenta de los vectores
+1) NO se anidan (son unidimensionales)
+2) Siempre tiene el mismo tipo de datos (ej. todos numericos)
+3) Un tipo de dato suelto es un VECTOR ATOMICO 
+
+```{r}
+X<-c(1,"2",TRUE)
+print(X)
+#Los toma todos como str
+
+c(c(1,c(4,c(3))))
+#Unidimensionales no importa cuantas veces lo anides 
+
+```
+
+4) Para acceder a sus elementos se usan indices 
+
+```{r}
+x<-c("maria","paula","josefina")
+x[3]
+x[1:2]
+x[c(1,2,3)]
+```
+### Operaciones con vectores
+
+```{r}
+seq(1,100,5)
+#Secuencia del 1 al 100 con pasos de a 5
+
+c(1,2,3,4)+c(2,3,4,5)
+c(1,3,5,6)+c(2,4)
+#"Duplica" el vector mas chico para "completar" el mas grande
+
+sum(1:100)
+sum(seq(2,100,2))
+#Suma de todos los pares del 2 al 100
+
+length(c(1,2,3,4))
+c(2,5,8)/2
+#Tener la mitad de un vector
+```
+##Ejercitacion Vectores: 
+• SAMPLE Y RUNIF (Para numeros aleatorios)
+• UNIQUE 
+
+```{r}
+library(dplyr)
+# 1) Selecciona la mitad de las columnas impares de iris 
+iris[seq(1:ncol(iris))%%2!=0][1:(nrow(iris)/2),] #Primero columnas impares y despues mitad de filas
+
+# 2) Selecciona las primeras 5 filas y las ultimas  5 filas de iris.
+iris[c(c(1:5),c(147:150)),]
+
+# 3) Selecciona la mitad de las filas de iris de forma alternada empezando por la primera
+iris[seq(1,nrow(iris),2),]
+
+# 4) Utilice dos alternativas para realizar un muestreo aleatorio de tamnio 20 de las filas de iris
+iris[sample(nrow(iris), size = 20, replace = FALSE), ]
+iris[as.integer(runif(20,1,nrow(iris))),]
+muestra_aleatoria_dplyr <- iris %>%
+  sample_n(size = 20)
+
+# 5) realice una copia de iris con el muestreo aleatorio para cada especie de 5 filas para cada una de las espacies de las  columnas "Petal.Length" y "Species"
+
+copia_iris<-iris[iris$Species==unique(iris$Species)[1],][sample(1:50,5),][,c("Petal.Length","Species")]
+#Filtro las filas por una especie, hago un muestreo aleatorio de 5 filas entre el 1 y 50, selecciono las columnas que quiero
+```
+
+
+# Listas
+
+###Cosas a tener en cuenta 
+
+1) Todo lo que NO es un vector
+2) Pueden haber distintos tipos de datos 
+3) Pueden anidarse (puede haber una lista dentro de otra lista)
+4) Para acceder los elementos 
+```{r}
+x<-list(1,2,list(T,F,F),list('A','B'))
+```
+
+##### Para que output sea un VECTOR --> Doble corchete [[]]
+##### Para que output sea una LISTA --> Corchete simple
+
+```{r}
+print("*****")
+x[[4]][[2]]
+#Del elemento 4 de la principal, agarro el 2ndo elemento y lo muestra como vector
+print("*****")
+x[[4]][2] 
+#Lo muestra como una lista al elemento "B"
+print("*****")
+x[4][2]
+#Dice [[1]] NULL
+print("*****")
+x[3] #Lo muestra como una lista de la lista
+print("*****")
+x[[3]] # Lo muestra como list(T,F,F)
+
+
+```
+# Data Frame 
+
+En escencia es una lista de vectores de igual longitud 
+Cada vector es una COLUMNA de la base de datos (x lo tanto los datos son homogeneos, son del = tipo)
+
+Un dataframe en formato tidy cumple con 3 condiciones
+• Cada variable tiene su propia columna
+•Cada observación tiene su propia fila
+• Cada valor tiene su propia celda
+
+Entre corchetes [] puede ir una condicion
+```{r}
+df<-data.frame(provincia=c("Santa Fe","Buenos Aires","Tierra del Fuego"), poblacion=c(4,3,12))
+```
+### Algunas funciones 
+
+```{r}
+df$provincia
+#Muesta como vector las provincias 
+df['provincia']
+#muestra la columna provincia 
+
+#CONDICION
+df[df$provincia=="Santa Fe"]
+#Muestra la linea donde la provincia es Santa Fe
+
+#AGREGAR UNA COLUMNA
+df["Anio de Fundacion"]=c(2002,2003,2005)
+df$cantidad_arboles<- c(1,2,3)
+df <- df %>% mutate(rt = c(20, 30, 40)) #acordarse de asignarlo 
+df
+
+#MOSTRAR TIPO DE DATO DE UNA COLUMNA
+ncol(df)
+df %>% str()
+
+#MEDIANA, VALOR MAXIMO Y VALOR MINIMO
+mtcars %>% slice_max(wt)
+
+mtcars %>% slice_min(wt)
+
+mtcars %>% summarise(median_wt = median(wt))
+
+mtcars %>% summarise(mean_wt = mean(wt))
+```
+
+### Paquete deplyr (dentro de tydiverse)
+
+• select --> Seleccionar columnas que cumplan con la condicion
+• filter--> Seleccionar filas que cumplan con la condicion
+• arrange--> Como ordenar las filas
+• rename--> Cambiarle el nombre a una columna
+• mutate --> Hace una nueva columna (modifica el original)
+• summarise/summarize --> Va casi siempre despues de un group by
+• group_by --> Agrupa por una categoria
+• %>% (operador pipe) --> Dice el orden o da un orden a "funciones anidadas" (cual viene despues de la otra)
+
+```{r}
+library(dplyr)
+
+iris %>% 
+  filter(Species=='setosa',Petal.Length>1.2) %>% 
+  mutate(area=Sepal.Length*Sepal.Width) %>% 
+  rename(largo_sepalo=Sepal.Length)
+
+```
+### Funciones apply 
+
+1) apply() 2) sapply() 3) lapply() 4) mapply()
+```{r}
+#Sapply permite aplicar una funcion a todo un df (es lo que interesa)
+
+iris %>% sapply(mean,na.rm=T) #Excliuye valores NA al calcular la media
+```
+
+
+# Funciones 
+
+Tiene una estructura tipica
+Hay distintas "funcioncitas" que se usan:
+
+• paste --> Funciona como un print para imprimir un mensaje al final
+```{r}
+potencia<- function(x, y)
+{result <- x^y
+paste(x,"elevado a la potencia de", y, "es", result)
+}
+
+potencia(4,2)
+```
+•append --> Sumar a un vector un valor
+```{r}
+pares=function(n){
+col=c()
+for (i in seq(n)){
+if(i%%2==0){
+col=append(col,i)
+}
+}
+return(col)
+}
+
+pares(10)
+```
+•return --> Mostrar lo que devuelve
+```{r}
+f<- function(x,y)
+{
+  if(is.character(x)|is.character(y))
+    return("todos los input debe ser numérico")
+  x+y
+}
+f(4,3)
+f("hola",3)
+```
+
+•readline --> Funciona como un INPUT
+•cat--> Muestra un texto
+•encuesta() --> Vuelve a llamar a una funcion (encuesta es el nombre de la funcion)
+
+```{r}
+encuesta <- function() {
+  r <- readline("¿Te gusta R? (s/n) : ")
+  if ( r == "s" || r == "S") {
+    cat("¡Estaba seguro de eso!\n")
+    return(invisible(0))
+  } else {
+    cat("¿Estás seguro/a? Creo que te has equivocado al responder.\nVuelve a intentarlo.\n\n")
+    #encuesta()
+  }
+}
+
+encuesta()
+```
+
+•merge --> Se usa para el INNER JOIN, FULL OUTER JOIN, LEFT JOIN Y RIGHT JOIN
+
+```{r}
+table1 <- data.frame(P_ID = c(1:8),
+                     gender = c("male", "male", "female","female","female", "male", "female", "male"),
+                     height = c(71,73,64,64,66,69,62,72),
+                     weight = c(175,225,130,125,165,160,115,250))
+
+table2 <- data.frame(P_ID = c(1, 2, 4, 5, 7, 8, 9, 10),
+                  sex=c("male","male","female","female","female", "male", "male", "female"),
+                     visits = c(1,2,4,12,2,2,1,1),
+                     checkup = c(1,1,1,1,1,1,0,0),
+                     follow_up = c(0,0,1,2,0,0,0,0),
+                     illness = c(0,0,2,7,1,1,0,0),
+                     surgery = c(0,0,0,2,0,0,0,0),
+                     ER = c( 0,1,0,0,0,0,1,1))
+
+#INNER JOIN : Lo que aparece en ambos 
+combined_data <- merge(x = table1,       # First data frame
+                       y = table2,       # Second data frame
+                       by = "P_ID")      # Common column to merge on
+#FULL OUTER JOIN : Combina todos esten o no 
+merge(x = table1, y = table2, all = TRUE)
+
+#RIGHT JOIN
+merge(x = table1, y = table2, all.y  = TRUE)
+
+#LEFT JOIN
+merge(x = table1, y = table2, all.y  = TRUE)
+```
+
+###### Filtrados
+• WHICH y %in% --> Seleccionar y filtrar elementos
+```{r}
+combined_datafem= combined_data[,combined_data['gender'] =='female']
+```
+
+```{r}
+#Nuevo df con esa informacion 
+combined_dataltos= combined_data[,subset(combined_data['height'] >50)]
+```
+
+```{r}
+table1B= combined_data[ which(names(combined_data) %in% c('P_ID','gender','height','weight'))]
+```
+
+
+## Ejercicios Data Frames - dplyr - Funciones
+
+Ejercicio 1
+•n() --> Hace los recuentos por cada grupo 
+• Casi siempre despues de un group by va un summarise
+
+```{r}
+#datasets::ToothGrowth
+#a) ¿Cual es la longitud promedio de los dientes por cada tipo de vitamina?
+ToothGrowth %>% group_by(supp) %>% summarise(longitud_promedio_dientes=mean(len),cantidad=n())
+
+#b) Obtener la fila correspondiente al conejillo de indias con el diente mas largo.
+ToothGrowth %>% filter(len==max(len))
+
+#c) Ordernar el dataset de menor a mayor de acuerdo a la longitud de los dientes.
+ToothGrowth %>% arrange(len)
+
+#d) Seleccionar los registros en el cual "len" toma valores entre 5 y 10
+ToothGrowth %>% filter(len>5,len<10)
+```
+
+Ejercicio 2
+• head (10)
+###DISCRETIZAR LA VARIABLE --> Hacerla una columna separada
+• CASE_WHEN
+```{r}
+#datasets::ChickWeight
+
+#1) ¿Cual es el peso promedio de los pollos? ¿Cual es el peso por promedio en cada grupo?
+ChickWeight %>% group_by(Chick) %>% summarise(peso_promedio_grupo=mean(weight),cantidad=n())
+
+#2) ¿Cuanto pesan los 10 pollos más liviandos que comieron de la dieta `1`? ¿Cuales son los mas pesados de esa dieta?
+ChickWeight %>% filter(Diet=="1") %>% arrange(weight) %>% head(10)
+
+#3) De la base total, obtener los registros con indice impar.
+ChickWeight[seq(1,nrow(ChickWeight),2),]
+ChickWeight[1:nrow(ChickWeight)%%2!=0,]
+
+#4) Discretizar  la variable `weight`: ¿Cuantos pollos pesan mas de 50 lbs? ¿cuantos menos? ¿cuantos entre 50 y 100?¿cuantos más de 100?
+
+ChickWeight = ChickWeight %>% mutate(cat_peso=
+case_when(
+  weight<50~"liviano",
+  weight<100~"mediano",
+  T~"pesado"
+))
+
+#5) Del punto anterior se generaron categorías, para cada categoría, ¿cuantos pollos comieron cada dieta?
+ChickWeight %>% group_by(cat_peso) %>% summarise(n=n())
+```
+
+Ejercicio 3 - Funciones
+
+• ELSE y IF
+
+####  Mascara Booleana
+```{r}
+#a) Crear una funcion que tome como parametro un numero e indique si es divisible por 5.
+ver_si_es_divisible<-function(n){
+  if(n%%5==0){
+    paste("el numero",n,"es divisible por 5")}
+  else{
+    paste("El numero no es divisible por 5")
+  }
+}
+ver_si_es_divisible(5)
+
+#b) Crear una funcion que tome como parametro una nota del 1 al 10 e indique si recursa (1 al 3), aprueba (4 a 6), o promociona (7 al 10)
+ver_estado_alumno <- function() {
+  n <- as.numeric(readline("Ingrese la calificacion del alumno "))
+  if (is.na(n)) {
+    cat("Entrada no válida, asegúrate de ingresar un número.\n")
+    return()
+  }
+  
+  if (n < 1 | n > 10) {
+    cat("Ese número no es válido, prueba de nuevo.\n")
+    return()
+  } else if (n < 3) {
+    cat("Perdón campeón pero recursas.\n")
+  } else if (n < 7) {
+    cat("Aprobaste.\n")
+  } else if (n >= 7) {
+    cat("Promocionaste.\n")
+  }
+}
+ver_estado_alumno()
+
+
+#c) Creer una funcion que tome como parametro un vector e indique cuales son los valores mayor al promedio y cuales menores
+#el output debe ser un vector de la misma longitud que el original y que cada elemento 
+#sea "TRUE" si es mayor al promedio y "FALSE" si es menor al promedio
+
+valores_con_respecto_al_promedio<-function(v){
+  mascara<-v>mean(v)
+  vector_final<-as.logical(mascara) #en vez de hacer una mascara aparte, la puedo poner directo ahi ()
+  print(vector_final)
+}
+
+vector<-c(1,1,2,2,1)
+valores_con_respecto_al_promedio(vector)
+
+```
+
+# Graficos 
+
+##### Histograma
+• abline
+```{r}
+hist(iris$Sepal.Length, col = "darkorchid")
+rug(iris$Sepal.Length) #Agrega "pelos" en el eje horizontal
+abline(v = median(iris$Sepal.Length), col = "lightyellow", lwd = 4) #Agrega una linea en la mediana
+```
+
+##### Histograma Multiple
+• add
+```{r}
+hist(iris$Sepal.Length, col='pink', xlim=c(1, 7), ylim = c(0,250),main = "Histograma")
+hist(iris$Sepal.Width, col='#FF1493', add=TRUE)
+
+
+```
+
+
+#### Plot
+• with
+```{r}
+iris$areaa=log(iris$Sepal.Length) #Hace una nueva columna, aplicandole el logaritmo a la vieja
+with(iris, plot(Sepal.Length, areaa)) #Plot de puntos
+```
+
+
+# Flow Control
+
+#### Conceptos generales 
+
+Uso de los CONDICIONALES --> IF y WHILE
+
+• Condiciones multiples
+```{r}
+nota.del.final = 7
+if(nota.del.final < 4){
+  condicion = "recursa"
+} else if (nota.del.final < 7){
+  condicion = "recupera"
+} else{
+  condicion = "promociona"
+}
+condicion #promociona
+```
+
+• Con un vector
+```{r}
+esta_lloviendo = c(1,0,0,1,0,1,0,0,1,1)
+esta_nublado = c(0,1,0,0,1,0,0,1,0,1)
+
+llevar_paraguas = ifelse(esta_lloviendo == 1, yes= T,  no= ifelse(esta_nublado==1, yes = T, no = F))
+```
+
+• Ejemplo con WHILE y FOR
+```{r}
+valor=0
+conteo=0
+while(valor < 50) {
+  valor <- valor + sample(x = 1:10, size = 1)
+  #sample es la funcion
+  #help(sample) --> Muestra aleatoria entre esos elementos
+   #Sin que me los repita
+   #Por default no los vuelve a meter
+  conteo <- conteo + 1
+}
+
+valor
+conteo
+for(i in iris$Sepal.Length){
+  print(i)
+  if(i > 5.1){
+    break
+    #Break sirve para detener el for/while
+  }
+}
+```
+
+• Uso del REP --> Vector y cuantas veces repite cada elemento del vector
+```{r}
+nota.del.final=c(2,3,4)
+rep(nota.del.final,2)
+rep(5,6)
+rep(nota.del.final,nota.del.final)
+```
+
+# GGplots
+
+Se le van sumando "features" usando el +
+• coord_flip() es para invertir el grafico de barras (ahora es horizontal)
+
+```{r}
+library(ggplot2)
+ggplot(data = iris)+ geom_point(aes(x = Sepal.Length, y = Sepal.Width, color= Species),
+                                size=3,
+                                alpha=0.7)+scale_x_log10()
+
+ggplot(data = iris)+ geom_line(aes(x = Sepal.Length, y = Sepal.Width, color= Species),
+                                size=1,
+                                alpha=0.7)
+ggplot(data = mtcars, aes(x = gear)) + 
+  geom_bar() + 
+  xlab("N?mero de Velocidades") + 
+  ylab("Cantidades") + 
+  ggtitle("Gr?fico de Barras")+
+  coord_flip()
+```
+
+
+# Mirar guia de ejercicios 17-8

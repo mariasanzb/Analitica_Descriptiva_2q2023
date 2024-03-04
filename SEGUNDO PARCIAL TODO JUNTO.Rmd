@@ -1,0 +1,1213 @@
+# Relacion entre variables - Repaso Test de Hipotesis (teoria)
+(Ver antes RMD de Inspeccion_estadisticaq121.Rmd)
+
+#### Correlaciones
+
+- Valor atipico (outlier) sucede en una relacion entre dos variables numericas
+- Las **relaciones** son visualizables con un diagrama de dispersion (scatter plot, se puede hacer con ggplot2) --> Pueden ser *lineales o no lineales*
+- Los datos pueden tener una correlacion *positiva, negativa o nula*
+- Para interpretar que tan fuertw es una correlacion podemos utilizar el criterio de *Cohen* que para  valores absolutos indica que: Entre 0.1 - 0.3 representan unefecto pequeño,Entre 0.3 - 0.5 un efecto medio y>= .5 un efecto grande
+- Outlier imapacta en la correlacion 
+
+- **Coeficiente de correlacion de Pearson**: Mide el grado de asociacion lineal entre un par de variables (tendencia lineal, no existen valores atipicos, las variables deben ser numericas, mas de 30 puntos o observaciones)
+Ho: El coeficiente de correlacion obtenido procede de una poblacion cuya correlacion es 0 
+H1: El coeficiente de correlacion obtenido procede de una poblacion cuyo coeficiente de correlacion es distinto de 0
+
+-**Coeficiente de Spearman**: Mide las relaciones monotonas creeciente NO lineal (forma tipo S)
+
+Ojo que si tenemos un ootlier se deforma todo y no parece tener forma de S
+```{r}
+#library(corrplot)
+#install.packages("ggplot2")
+library(ggplot2)
+library(ggplot2)
+x<-seq(-50,49)+rnorm(100,mean = 0,sd=10)
+y<-10*x+20*x^2+x^3-8+rnorm(100,mean = 0,sd=50)
+df= cbind(x,y)
+df=as.data.frame(df)
+ggplot(df,aes(x = x, y = y)) + geom_point()+ ggtitle(" Scatter plot")
+cor(x,y)
+cor(x, y, method = "spearman") #Hacer este porque tiene forma de S el scatter plot
+
+```
+
+
+```{r}
+#No me deja instalar corrplot
+
+#install.packages("corrplot")
+#library(corrplot)
+data(mtcars)
+head(mtcars)
+dim(mtcars)
+cor(mtcars$mpg, mtcars$hp, method = "spearman")
+cor(mtcars)
+M <- cor(mtcars, method = "pearson")  #permite ejecutar una matriz de correlaci?n
+#corrplot(M, method = "ellipse")
+```
+
+
+```{r}
+cor(x,y,method="pearson")
+cor(x,y,method="spearman")
+cor.test(mtcars$mpg, mtcars$hp)  # cor.test analiza la significancia de la correlacion, utilizando el contraste t-student
+```
+
+- Para la medida de correlacion se puede hacer un *heatmap*
+- Para medir el **grado de asociacion** esta la *covarianza* y la *correlacion*
+
+
+## Test de Hipotesis 
+- Regla para ver si se acepta o se rechaza una afirmacion acerca de una poblacion
+- Ho: hipotesis nula ("no hay efecto"--> Lo que queremos desaprobar)
+ H1: hipotesis alternativa ("Lo que se intenta probar que es verdadero)
+ 
+- **Errores en un Test de Hipotesis**:
+*error tipo I*--> alfa (nivel de significancia del test)(Rechazar Ho siendo Ho verdadera)
+*error tipo II* --> beta (No rechazar Ho siendo falsa). Si tiene alta potencia (beta) se reduce el riesgo de cometer este error. Se debe asegurar que el tamanio de la muestra es lo suficientemente grande. 
+*1-beta* -->  Rechazar Ho siendo falsa 
+*1 - alfa* --> No rechazar Ho siendo Ho verdadera 
+
+-------------------------------------------------------------------------------
+**Resumen de ver que test se usa**
+
+*Chi Cuadrado*: Para vincular variables categoricas 
+H0: Hay independecia entre la categoria ..... y .....
+H1: No hay independencia entre la categoria ..... y ......
+
+*T de Student*: Vincula una numerica y una categorica (ej. salario hombres y mujeres). Testea los promedios.
+H0:No hay diferencia de medias 
+H1: Hay diferencia de medias 
+
+*Kolmogorov-Smirnov*: Vincula una numerica y una categorica.Testea la distribuicion completa a diferencia del T de Student. Testea a ver si las muestras vienen de la misma poblacion). Puede ser:
+- Dos empiricas : ej.Compara dos grupos de estudiantes
+- Una teorica y una empirica: ej. Si la distribucion de edad de este curso tiene distribucion normal
+H0: La distribucion es la misma en ambas poblaciones
+H1: La distribucion no es la misma en ambas poblaciones
+
+*Pearson*: Test de correlacion para dos variables numericas.Es para la linealidad
+
+*Spearman*: Es para la monotonia (cuando uno aumenta el otro siempre aumenta, en ningun momento el comportamiento de uno baja con respecto a otro)
+H0: No existe correlacion sigfnificativa entre ....
+H1: Existe correlacion significativa enrtre ...
+
+Para cualquier test sirve el **?t.test()**
+
+-------------------------------------------------------------------------------
+
+
+#### Test T de Student 
+Para la media 
+Si alfa=0.05 , se rechaza Ho si el p-valor (probabilidad de sacar determinado valor sabiendo el poblacional) es menor a alfa = 0.05
+mu = El valor que esta en el H0
+```{r}
+#A dos colas
+t.test(iris$Petal.Length, mu=4, alternative = "two.sided", conf.level = 0.95) 
+
+#A una cola (a izquierda)
+t.test(iris$Petal.Length, mu=4, alternative = "less")
+
+#A dos colas
+t.test(iriss$Petal.Length, irisv$Petal.Length, alternative = "two.sided", conf.level = 0.95)
+
+#Para dos variables (ej. contrastar si la longitud promedio del pétalo para una especie es igual a lalongitud promedio de otra especie)
+t.test(iris$Petal.Length[iris$Species=="setosa"],iris$Petal.Length[iris$Species=="versicolor"])
+
+t.test(iris$Petal.Length[iris$Species=="setosa"], iris$Petal.Length[iris$Species=="virginica"])
+
+```
+
+
+#### Test de Fisher - Igualdad de varianzas
+Para las varianzas
+```{r}
+# Ejemplo : Longitud promedio del petalo para una especie es igual a la longitud promedio de otra especie
+var.test(iris$Petal.Length[iris$Species=="setosa"],iris$Petal.Length[iris$Species=="versicolor"])
+```
+Tamanio del efecto se lo conoce como la *fuerza de asociacion*. Las medidas mas conocidas son la de phi o Cramer's V. 
+
+pequeño: 0.1, mediano: 0.3, grande: 0.5
+```{r}
+#library("vcd")
+#assocstats(M)
+```
+
+
+#### Test de Pearson (ya visto arriba)
+
+#### Test de Chi - Cuadrado
+
+- Vincula variables categoricas
+- Usa una *tabla de contingencia* (ej. genero y horas de estudio)
+Ho: Las variables son independientes por lo que una variable mo varia entre los distintos niveles de la otra variable. (ej. El horario de estudio es independiende del genero)
+H1:  Las variables son dependientes, una variable varia entre los distintos niveles de la otra variable. (ej. El horario de estudia varia segun el genero)
+
+```{r}
+M <- as.table(rbind(c(762, 327, 468), c(484, 239, 477)))
+dimnames(M)<- list(genero= c("F", "M"),
+Horario= c("Mañana","Tarde", "Noche"))
+plot(M, col = c("red", "blue"), main = "Genero vs.Turno")
+chisq.test(M)
+
+#Los horarios no son independientes del genero porque el p- valor es menor a 0.05. Se rechaza Ho
+```
+
+*Valores residuales de Pearson* --> Diferencia entre los valores observados y los valores esperados. 
+```{r}
+chisq.test(M)$residuals
+chisq.test(M)$stdres
+```
+#### Test de proporciones
+Deseo contrastar si la proporción de personas que prefieren una marca X es mas del 80%, seobservan 230 personas y de ellas 200 prefieren esa marca.
+```{r}
+binom.test(200, 230, p=0.8, alternative = "greater")
+```
+
+#### Test de normalidad - Shapiro Wilk
+
+```{r}
+shapiro.test(iris$Sepal.Length)
+```
+
+#### Test de igualdad de distribuciones - Kolmogorov - Smirnov
+H0: Las dos muestras provienen de la misma distribucion
+H1: Las dos muestras provienen de distribuciones distintas
+
+```{r}
+x=rnorm(100, 4,2.1)
+y=rnorm(100, 4.1,1.7)
+ks.test(x,y)
+
+ks.test(iris$Sepal.Length,iris$Petal.Length)
+#En este caso se rechaza H0 porque el p-valor es menor a 0.05
+```
+
+________________________________Ejercicios_______________________________________ 
+
+Seleccione de 2 o 3 variables y realice una breve descripcion estadistica que contenga medidas de tendencia central, variacion o frecuencia.Hacer un interrogante (**test de hipotesis**)que vincule 
+    a) Dos variables numericas
+    b) Una categorica y una numerica:
+        b.1) Discretizando la numerica
+        c.1) Analizando las distribuciones de la numerica por categor?a
+    c) Dos categoricas
+    d) Al menos 2 Gr?ficos relevantes realizados con ggplot2 (el resto puede ser realizado con las herramientas de R-base)
+
+```{r}
+library(tidyverse)
+library(readr)
+data<- read_csv("~/ITBA MARIA/3 1Q/Analitica Descriptiva/spotify(1).csv")
+#View(data)
+```
+
+**a)** Dos variables numericas 
+-Si correlacion es 0, significa que no hay correlacion. 
+-Grafico scatter plot
+- Hipotesis: Hay una correlacion positiva entre el tempo y energy 
+- Coloquialmente: Son mas energeticas las canciones con tempo mas alto. 
+- H0: No existe correlacion sigfnificativa entre tiempo y la energy
+  H1: Existe correlacion significativa enrtre el tiempo y la energy 
+-Test que corresponde: Spearman para evaluar monotonia. Siempre que uno sube el otro tambien.
+
+```{r}
+?cor.test() #Esto me da informacion de la funcion
+cor.test(data$energy,data$tempo,alternative="greater",method="spearman",exact=NULL,conf.level = 0.95, contuinity = FALSE)
+```
+Se rechaza la Hipotesis Nula cuando el p-valor es menor a 0.05. En este caso se rechaza la Hipotesis nula ya que el p-valor es p-value = 5.09e-15. Por lo tanto, las canciones con mas energia son tambien las canciones con volumen mas alto. 
+
+**b)1**Una categorica y una numerica discretizando la numerica 
+*Discretizar* = Dividirlo en distintas categorias (como el caso del case when)
+--> Voy a discretizar Popularity en baja (menor a 30), media(de 30 a 60) y alta (60 a 100)
+
+```{r}
+data_b1 = data %>% mutate(cat_popularity=
+case_when(
+  popularity<31~"bajo",
+  popularity<61~"mediano",
+  T~"alto"
+))
+```
+- Hipotesis: Hay una relacion entre el genero de la cancion y la categoria de la popularidad de la misma
+- Coloquialmente: Hay canciones que por ser de ese genero, tienen mas tendencia a ser mas populares.   
+- H0: Hay independecia entre la categoria de la popularidad y el genero
+  H1: No hay independencia entre la categoria de la popularidad y el genero
+-Test que corresponde: Chi-Cuadrado porque me quedan dos categoricas ahora (discretize la numerica)
+
+```{r}
+?chisq.test()
+chisq.test(data_b1$cat_popularity,data_b1$genre,correct = TRUE,
+           p = rep(1/length(x), length(x)), rescale.p = FALSE,
+           simulate.p.value = FALSE, B = 2000)
+```
+Se rechaza la hipotesis nula cuando el p- valor es menor a 0.05. En este caso se rechaza la hipotesis nula por lo que se puede afirmar que no hay independencia entre esas variables. Hay una relacion entre el genero y la categoria de la popularidad.
+
+**b)2.** Analizando las distribuciones de la numerica en relacion a la categorica
+- Hipotesis: Hay una relacion entre si es explicita y la popularidad (popularidad y explicit) (Existe correlacion + o -)
+- Coloquialmente: La popularidad en numero de las canciones varia dependiendo si es explicita o no
+- H0: La distribucion es la misma en ambas poblaciones (FALSE y TRUE de categoria explicit)
+  H1: La distribucion no es la misma en ambas poblaciones 
+-Test que corresponde: Ks. Porque son una numerica y una categorica y voy a estar evaluando la distribucion de la misma. Veo si son de la misma poblacion.
+
+*Le pongo los dos vectores que voy a estar evaluando (NO data$explicit). En el caso de ks y t*
+
+```{r}
+?ks.test()
+ks.test(data[data$explicit==T,]$popularity,data[data$explicit==F,]$popularity)
+```
+Se rechaza la hipotesis nula. Por lo tanto la distribucion no es la misma en ambas poblaciones. 
+
+### c) Dos categoricas 
+
+- Hipotesis: Hay una relacion entre el genero de la cancion y el mode
+- Coloquialmente: Hay canciones que por ser de ese genero, tienen tendencia a ser de determinado mode   
+- H0: Hay independecia entre el genero de la cancion y el mode
+  H1: No hay independencia entre el genero de la cancion y el mode. 
+-Test que corresponde: Chi-Cuadrado porque me quedan dos categoricas
+
+```{r}
+chisq.test(data$mode,data$genre)
+```
+
+Como el p-valor es menor a 0.05, se rechaza H0.Por lo tanto hay relacion entre ambas
+
+### d) Al menos dos grafiocs relevantes con ggplot
+```{r}
+#Scatter plot - 2 variables numericas
+ggplot(data, aes(x = energy, y = loudness)) +
+  geom_point() +
+  labs(title = "Scatterplot de Energy vs. Loudness",
+       x = "Energy",
+       y = "Loudness")
+#Heatmap
+
+(PREGUNTAR! Y ADEMAS NO DEJA INSTALAR CORRPLOT)
+
+```
+
+_____________________________________ . ______________________________
+
+
+# Missings
+
+```{r}
+library(rmarkdown)
+library(knitr)
+library(DT)
+library(readxl) # leer archivos excel
+library(dplyr) #cuartiles
+library(ggplot2) 
+library(ggExtra) #mejorar grafico
+library(nortest) #normalidad
+library(expss) 
+library(TMB)
+library(sjPlot)
+library(gplots)
+library(Amelia) #gr?fico missmap
+#library(DMwR) # imputar datos
+library(Hmisc) # imputar datos
+library(mice)
+library(VIM) # paquete de imputacion
+library(questionr) # para usar freq.na
+library(frequency)
+library(grid)
+library(gridExtra)
+#library(RGtk2)
+#library(VIMGUI) #Visualization and Imputation of Missing Values
+
+```
+
+
+```{r}
+bweight <- read_excel("bweight.xls" )
+summary(bweight)
+freq.na(bweight)
+summary(bweight$married)
+```
+
+Patron de Missings: Paquete Mice 
+```{r}
+md.pattern(bweight)
+bweight_plot <- aggr(bweight, col=c('navyblue','yellow'),
+                    numbers=TRUE, sortVars=TRUE,
+                    labels=names(bweight), cex.axis=.7,
+                    gap=3, ylab=c("Datos faltantes","Patron"))
+```
+
+PREGUTAR
+
+**1: Entre variables con valores faltantes**
+**2:Entre variables con valores faltantes y variables con valores no perdidos**
+
+1) Creo un vector que defina solo las columnas de variables numericas. A partir de eso un subconjunto solo con las variables numericas
+
+```{r}
+library(readxl)
+bweight <- read_excel("bweight.xls" )
+idx <- which(sapply(bweight, class) %in% c("numeric","integer"))
+n_bweight <- subset(bweight, select = idx )
+```
+
+**Entre variables con valores faltantes**
+
+-Identificar las columnas con valores faltantes en "n_bweight" y crear un nuevo conjunto de datos "dummyNA" que contiene información sobre los valores faltantes en esas columnas específicas.
+```{r}
+library(dplyr)
+summary(n_bweight)
+colnames(n_bweight)
+#Crea un nuevo conjunto de datos que tiene el mismo número de filas que "n_bweight" pero solo contiene valores booleanos que indican si cada valor en "n_bweight" es NA (valor faltante) o no
+dummyNA <-
+as.data.frame(abs(is.na(n_bweight))) %>% 
+  select(black,married,mom_age, cigsper,m_wtgain) #Se selecciona las columnas que tienen valores faltantes
+head(dummyNA)
+colnames(dummyNA)
+```
+
+```{r}
+correlation_s <- cor(dummyNA, use = "pairwise.complete.obs", method = c("spearman"))
+correlation_p <- cor(dummyNA, use = "pairwise.complete.obs", method = c("pearson"))
+
+```
+
+PREGUNTAR NO ME DEJA EL CORRELATION 
+```{r}
+library(corrplot)
+corrplot(correlation_p, method = "ellipse")
+
+correlation_p
+```
+
+Ver si el valor faltante en una variable, es dependiente del valor faltante en otra
+```{r}
+# el valor del faltante de una variable esta depende del faltante en otra
+summary(dummyNA$married)
+```
+
+Conclusion: Existe una fuerte correlacion entre las dos variables con los valores faltantes. Podemos concluir que los valores faltantes en una variable estan relacionados con los valores faltantes en otra variable. 
+
+**Entre variables con valores faltantes y variables con valores no perdidos**
+- Primero necesitamos cambiar la variable categorica a un valor numerico para obtener la correlacion para todas las variables.
+
+```{r}
+cor(n_bweight %>% mutate_if(is.factor, as.numeric), 
+    dummyNA, use = "pairwise.complete.obs") %>% 
+  round(digits = 2) 
+```
+
+*MCAR (prueba multivariada de falta completamente al azar)* 
+--> Se utiliza para evaluar si los datos faltantes en un conjunto de datos siguen un patrón aleatorio o si hay evidencia de que las diferencias en las medias de las variables entre subgrupos con patrones de datos faltantes similares son significativas. 
+--> Se basa en comparar las medias observadas con las medias esperadas utilizando el algoritmo EM y se utiliza un estadístico de prueba que sigue una distribución chi-cuadrado bajo la hipótesis de que los datos son MCAR. 
+
+H0: Datos siguen un patron MCAR, los datos se perdieron de manera completamente aleatoria (los datos faltantes en un conjunto de datos siguen un patrón de manera completamente al azar)
+H1: Los datos no siguen un patron MCAR
+
+* Un p valor mas alto indica que la probabilidad de que falten datos es MCAR
+
+Estadistico:un valor de Chi-Cuadrado
+
+```{r}
+library(naniar)
+mcar_test(n_bweight)
+```
+
+*Link util para ver lo de Missing Data y handling Missing data*:
+https://bookdown.org/drki_musa/dataanalysis/missing-data.html#exploring-missing-data
+
+###### Como tratar los valores faltanes 
+
+**1) Eliminacion por lista**
+Por default, R excluye las lineas con datos faltantes. 
+Me dice cuantas filas de faltantes fueron excluidas
+--> Solo cuando hay poca missing data y la missing data es MCAR
+
+```{r}
+bweight <- read_excel("bweight.xls" )
+lw <- lm(weight ~ ., data = bweight)
+summary(lw)
+library(questionr)
+faltantes= function(data){
+  a=freq.na(data)
+  suma=0
+  for (i in 1:dim(a)[1]){
+    suma=suma+a[i]
+  }
+  return(suma)
+}
+
+faltantes(bweight)
+md.pattern(bweight)
+```
+**2) Imputacion simple - sustitucion media**
+
+```{r}
+bweight <- read_excel("bweight.xls" )
+bweight1 <- mutate(bweight, wtgain_prom = impute(m_wtgain, mean)) # reemplazo por la media
+#View(bweight1)
+```
+
+**3) Imputacion simple - sustitucion mediana**
+
+```{r}
+bweight <- read_excel("bweight.xls" )
+bweight2 <- mutate(bweight, wtgain_med = impute(m_wtgain, median)) # reemplazo por la mediana
+median(bweight$m_wtgain, na.rm = TRUE)
+#View(bweight2)
+```
+
+**3) Imputacion simple - sustitucion de modo**
+
+```{r}
+mode <- function(x) {
+    return(as.numeric(names(which.max(table(x)))))
+  }
+bweight3 <- mutate(bweight, wtgain_fijo = impute(m_wtgain, mode(bweight$m_wtgain))) # reemplazo por un valor especifico
+#View(bweight3)
+```
+
+(Ver como imputar los black)
+
+**4) Imputacion unica - de regresion **
+
+- Imputo en baase a que cosas
+- Es como regresion lineal (Usando los betas)
+```{r}
+bweight <- arrange(bweight, m_wtgain)
+bweight_imp <- lm( m_wtgain ~ mom_age + cigsper + visit , data = bweight)
+summary(bweight_imp)
+#Esos numeros son los estimates del Summary
+bweight$imputado_g = -1.73593 -0.15349*bweight$mom_age -0.13351*bweight$cigsper +1.00844*bweight$visit
+summary(bweight)
+library(ggplot2)
+#Deberia ser de 45 grados pero despues se aleja, empieza a fallar
+ggplot(data = bweight)+ geom_smooth(aes(x = m_wtgain, y = imputado_g),
+                                 size=1,
+                                 alpha=0.5)
+
+```
+
+Ahora voy a IMPUTAR EL DATO --> Cada vez que no esta, remplazo el NA por la variable que genere nueva
+
+```{r}
+bweight <- mutate(bweight, m_wtgain_imp = ifelse(is.na(m_wtgain), imputado_g , m_wtgain))
+summary(bweight)
+```
+
+Genero varianle con datos imputados --> Ver si un dato inputado por construccion es parecido o no --> Comparo los summary 
+
+
+LO COMPARO CON LA DISTRIBUCION ANTES DE IMPUTACION 
+Ahora solo tengo un faltante --> Porque no los imputo a todos? --> Hay otra variable que tambiien es NA
+
+**5) Imputacion unica - del arbol de decision **
+
+Metodo mas completo de inputacion (KNN)
+
+Chequeo si hay datos faltanes o no y descargo las librerias
+```{r}
+bweight <- read_excel("bweight.xls" )
+anyNA(bweight) #Para chequear si hay un faltante en la base de datos
+library(RANN)  # required for knnInpute
+library(caret)
+preProcess_missingdata_model <- preProcess(as.data.frame(bweight) , method='knnImpute')
+preProcess_missingdata_model
+```
+Hago vecinos mas cercanos a la imputacion 
+El resultado va a estar NORMALIZADO ---> Para analisis predictivo es menor, para analisis descriptivo no porque tengo que recuperar el original
+
+- centro (resto por la media) 13 variables
+- Ignoro 0 
+- Uso los 5 vecinos mas cercanos para predecir los valores faltantes
+- hizo scale (dividio por la desviacion estandar) 13 variables 
+
+Clase con caracteristica de pre procesamiento 
+```{r}
+bweight_NEW <- predict(preProcess_missingdata_model, newdata = bweight)
+```
+
+VECINO MAS CERCANO (Tarda mucho)
+Asigna porque esta mas cerca de un grupo y mas lejos de otro
+Imputa todos los NA
+
+X1,X2 son categorias --> "si un dato esta muy cerca de la frecuencia rojo la asignas como "rojo" y le asigno su media"
+
+No hay faltante --> Los imputo a todos --> A veces pierde sentido 
+
+# Outliers
+
+Descargo las librerias y leo los archivos 
+```{r}
+library('readr') #para leer datos
+library('dplyr') #librería de tydiverse, para transformar datos
+library('ggplot2')#visualización 
+library('sjPlot')#tablas
+#library('funModeling')#la que nos simplifica el análisis
+library(readr)
+
+listings<- read_csv("listings (2).csv")
+```
+
+- Analizamos la variable CAMAS
+- Con un histograma veo la distribucion --> Todos los datos estan concentrados en los primeros valores
+-Entre 2 y 40 estan el 25% de los datos pero no sabemos como estan distribuidos
+
+NO FUNCIONA FUN MODELING
+```{r}
+#df_status (listings$beds)
+#Podria elimnar todos esos datos 
+summary(listings$beds)
+hist(listings$beds)
+```
+
+- Uso ggplot para hacer histogramas
+
+```{r global_options, include=F}
+ggplot (data= listings)+
+geom_histogram(mapping = aes(x = beds), binwidth = 5, fill = "orange", color = "black", ra.nm = TRUE)+  theme_bw()
+```
+
+- Cortando la distribución en el eje "y" con la función "coord cartesian" podemos tener un zoom in de los datos más extremos
+
+```{r}
+ggplot (data= listings)+
+  geom_histogram(mapping = aes(x = beds), binwidth = 5, fill = "orange", color = "black", ra.nm = TRUE)+
+coord_cartesian(ylim = c(0, 100))+
+    theme_bw()
+#Vemos que hay un bache hasta 40
+```
+
+- Podemos ver el *rango intercuartil* a través de *boxplot*. Todo lo que está fuera de los bigotes se lo considera outlier "leve" por estar por arriba o debajo de 1.5 veces del rango intercuartil.
+- Boxplot nos dice que hay valores extremos que se salen de esa distribucion
+- Todas las pelotitas son las que exceden --> Podemos decir que no pertenecen a la distribucion
+
+```{r}
+boxplot(listings$beds)
+boxplot(listings$beds)$out #te muestra los valores fuera de rango
+```
+
+-Calculo los cuantiles y defino limites del rango que voy a considerar normal, los que se encuentran por fuera son considerados "outlier"
+
+```{r}
+quantile(listings$beds, c(.10,.25,.50,0.75,.90,.95), na.rm=TRUE)
+#Que datos se encuentran entre esos valores
+sd(listings$beds, na.rm=TRUE)
+var(listings$beds, na.rm=TRUE)
+```
+
+- Identifica y marca valores atipicos en la variable CAMAS.Luego visualiza la distribución de la variable después de la limpieza mediante un histograma. Los valores atípicos se marcan como NA en la nueva variable 
+```{r}
+quantile(listings$beds, c(.10,.25,.50,0.75,.90), na.rm=TRUE)
+ric <- quantile(listings$beds, 0.75, na.rm = TRUE) - quantile(listings$beds, 0.25, na.rm = TRUE)
+limite_inferior<-1-1.5*ric
+limite_superior<-2+1.5*ric
+listings$beds_clean <-ifelse (listings$beds<limite_inferior|listings$beds>limite_superior, NA, listings$beds)
+hist(listings$beds_clean)
+```
+
+- Pruebo con rango mas amplio para outlier extremo 
+```{r}
+quantile(listings$beds, c(.10,.25,.50,0.75,.90), na.rm=TRUE)
+ric<-2-1
+limite_inferior<-1-3*ric
+limite_superior<-2+3*ric
+listings$beds_clean <-ifelse (listings$beds<limite_inferior|listings$beds>limite_superior, NA, listings$beds)
+hist(listings$beds_clean)
+```
+
+- tratemos la variable (CAMA) como categórica (no son taaaantas categorías)  y veamos la frecuencia 
+- Al aumentar el numero de camas --> Baja la frecuencia relativa --> "cuanto tengo que sacar"
+```{r}
+summarytools::freq(listings$beds, style = "simple")
+```
+
+-Si bien la teoría dice que hay que dejar fuera el último 5%, el análisis dice que puede haber propiedades con más de 5 camas ,así que vamos a sacar a  partir de 13 donde parece que los casos son realmente más atípicos
+Qué podemos hacer? --> *FILTER* (POCO RECOMENDADO, pierdo informacion)
+
+```{r}
+base_f<-filter(listings,beds <  13)
+summarytools::freq(base_f$beds, style = "simple")
+```
+
+- Otra opcion es:*PASAR LOS OUTLIERS A NA*
+
+```{r}
+listings<- read_csv("listings (2).csv")
+listings$beds_r <- ifelse(listings$beds > 13, NA, listings$beds)
+
+summarytools::freq(listings$beds_r, style = "simple")
+
+par(mfrow = c(1,2))
+hist(listings$beds, main = "con outliers")
+hist(listings$beds_r, main = "sin outliers")
+```
+
+- Otra opcion es: *TRANSFORMACION Y AGRUPAMIENTO*
+Crear un rango que nos unifique todos los ultimos valores
+
+```{r}
+library(summarytools)
+listings$beds_r2 <- ifelse(listings$beds ==1,"1", ifelse (listings$beds==2,"2", ifelse (listings$beds==3,"3",  ifelse (listings$beds <3|listings$beds> 5, "3-5", "6 o +"))))
+freq(listings$beds_r2)
+```
+
+-*IMPUTACION*
+
+En una columna nueva, asigna 1 a los casos donde la variable CAMA es mayor a 13
+```{r}
+median(listings$beds, na.rm=TRUE)
+listings$beds_r2 <- ifelse(listings$beds >13, 1 , listings$beds)
+summarytools::freq(listings$beds_r2, style = "simple")
+```
+
+```{r}
+Muestra <- subset(listings, beds < 13)
+#Cuando es, reemplazo los extremos por el maximo
+listings$beds_r2 <- ifelse(listings$beds >13, 13 , listings$beds)
+summarytools::freq(listings$beds_r2, style = "simple")
+```
+
+-*VALORES MISSINGS*
+Entiendo el patron usando Mice
+```{r}
+library ("mice")
+md.pattern(listings)
+```
+Puedo IMPUTAR --> Reemplazo por la mediana en los casos missings
+**NO POR LA MEDIA PORQUE ME DARIA DECIMAL Y NO SERIA CORRECTO**
+```{r}
+library(dplyr)
+library(Hmisc)
+listings <- mutate(listings, beds_impute = impute(beds, median))
+summarytools::freq(listings$beds_impute, style = "simple")
+```
+
+___________________Ejercicios missing-out.zip____________________________
+
+#### 1) Con la base de datos de properati para zona norte realice el analisis de missing y outliers:
+
+##### a) Detectar cuales son las variables que tiene outliers y missings. Recuerde utilizar histogramas, boxplots, transformaciones.
+
+```{r}
+#library(missForest) --> No funciona
+library(tidyverse)
+library(readr)
+zprop<- read_csv("ejerciciosmissing_out/znorte_properati.csv")
+#Incorporo el TC implicito
+zprop = zprop %>% mutate(tc = price_aprox_local_currency /price_aprox_usd )
+```
+
+**OUTLIERS**: Vero rapido el *summary* e *identifico las numericas*
+```{r}
+summary(zprop)
+zprop_num = zprop %>% select(c("price_aprox_usd","price_aprox_local_currency",'rooms','surface_in_m2','floor','tc'))
+```
+
+--> Hago los graficos para detectarlos 
+```{r}
+boxplot(zprop_num$price_aprox_usd)
+hist(zprop_num$price_aprox_usd)
+hist(log(zprop_num$price_aprox_usd))
+boxplot(log(zprop_num$price_aprox_usd))
+boxplot(zprop_num$price_aprox_local_currency)
+boxplot(log(zprop_num$price_aprox_local_currency))
+hist(log(zprop_num$price_aprox_local_currency))
+boxplot(zprop_num$rooms)
+boxplot(zprop_num$surface_in_m2)
+boxplot(zprop_num$floor)
+```
+
+Puedo probar hacerlo con **logaritmo**--> Puede que este viendo exageradamente la cantidad de outliers
+
+```{r}
+boxplot(log(zprop_num$rooms))
+```
+
+--> En vez del RIC puedo usar *cuartiles* por arriba o por abajo de que
+--> Verifico contexto si hay algo raro 
+
+```{r}
+upper = quantile(zprop_num$price_aprox_usd, 0.975,na.rm=T)
+lower = quantile(zprop_num$price_aprox_usd, 1-0.975,na.rm=T)
+zprop_num %>% 
+  filter(price_aprox_usd>upper|lower >price_aprox_usd) %>% 
+  arrange(-tc)
+```
+
+
+--> Tipo de cambio extremadamente alto, exploro los tipos de cambio usados.
+
+--> En el codigo de abajo veo que hay "raros" --> 8819.80 9700.70 --> Pueden ser error de tipeo
+
+--> Induccion en el analisis --> Podria dividir por 1000 para que tenga sentido. Los tipos de cambio mayores a 17.64 implican errores en la introduccion de los datos
+```{r}
+round(zprop_num$tc,2) %>% unique() %>% sort()
+zprop_num %>% filter(tc > 18)
+```
+
+##### b) Determinar si los outliers son datos reales o faltantes
+
+--> Fijarse *que causa que el TC este mal?* El precio en pesos es excesivamente alto. 40000 mil USD no tiene sentido por algo que tiene la mitad de m2
+
+-->Dependiendo del grado de conocimiento del tema que estemos trabajando, sospechamos que **no son outliers, sino faltantes**. Con mucho conocimiento del tema de trabajo, podria asumirse que hay que dividir los tipos de cambio por 1000
+*Si los pongo como outlier* tengo que revisar cual:
+Los precios en USD parecen razonables, los precios en pesos No.
+
+
+--> Elimino todos los que son mayores a 18 porque los tomo como faltantes
+```{r}
+zprop_num$price_aprox_local_currency[zprop_num$tc > 18] = NA
+zprop_num$tc[zprop_num$tc > 18] = NA
+zprop_num %>% filter(tc > 18)
+```
+
+**MISSINGS*
+- Verifico si son aleatorios 
+- El promedio me da el % de missings por variable 
+- Con el corrplot veo que salvo el tc, los demas parecieran ser *aleatorios*
+
+```{r}
+#Completa con 1 o 0 dependiendo si ese valor esta missiing o no 
+zprop_miss = sapply(zprop,is.na) %>% as_tibble() %>% sapply(as.numeric) %>% as_tibble()
+zprop_miss %>% summary()
+cor(zprop_miss)
+corrplot::corrplot(cor(zprop_miss))
+```
+
+- Usando metodo de spearman y pearson para la correlacion
+```{r}
+correlation_s <- cor(zprop_miss, use = "pairwise.complete.obs", method = c("spearman"))
+correlation_p <- cor(zprop_miss, use = "pairwise.complete.obs", method = c("pearson"))
+
+corrplot::corrplot(correlation_p)
+corrplot::corrplot(correlation_s)
+```
+
+##### c) Imputar faltantes de Superficie con regresion lineal
+
+- Veo si los p-valores son significativos --> NO HAY (uso glm)
+- Las variables mas significativas son price_aprox_usd y property_type
+```{r}
+zprop['surface_in_m2_miss'] = is.na(zprop$surface_in_m2)
+glm(surface_in_m2_miss~.,zprop %>% select(-surface_in_m2), family = 'binomial') %>% summary()
+lm(log(surface_in_m2)~.,zprop %>% filter(!is.na(surface_in_m2)) %>% select(-surface_in_m2_miss) %>% as_tibble()) %>% summary()
+```
+
+**Modelo de inputacion - Regresion lineal- Superficie **
+*VARIABLES NUMERICAS*
+--> Predecir la superficie en base al precio aproximado y el tipo de propiedad
+--> Se filtran los que no tienen NA en superficie y se ajusta el modelo de regresion lineal a ese subconjunto de datos 
+--> Se hace una prediccion de los valores de superficie 
+--> Se completan los NA con los redondeados 
+--> Se muestra un resumen de la cantidad de valores faltantes en la variable "Superficie" para verificar cuántos se han imputado con éxito.
+
+```{r}
+model_imp = lm(log(surface_in_m2)~price_aprox_usd+property_type,zprop %>% filter(!is.na(surface_in_m2))) #%>% summary()
+
+#Resumen del modelo
+model_imp %>% summary()
+
+#Prediccion de los valores faltantes --> Ver si lo que falta depende o no de algo 
+prediction=predict(model_imp,zprop%>% filter(is.na(surface_in_m2)))
+
+#Creo subconjunto de datos con y sin valores faltantes
+zprop_na = zprop %>% filter(!is.na(surface_in_m2))
+zprop_no_na = zprop %>% filter(is.na(surface_in_m2))
+
+#Imputo los datos faltantes con las predicciones redondeadas. Combino los conjuntos en un unico conjunto de datos 
+zprop_no_na$surface_in_m2 = round(exp(prediction), 0)
+zprop_surf_imp = rbind(zprop_na,zprop_no_na) %>% as_tibble()
+
+# Veo cuantos faltantes se imputaron --> Cuantos NA paso a tener
+#Los convirtio a los NA en TRUE O FALSE
+zprop$surface_in_m2_miss %>% summary()
+
+```
+--> TRUE me devuelve la cantidad de faltantes que tengo 
+-->Puedo tener NA aunque tenga variables para imputar
+Si faltan las variables para inputar el dato, tambien me faltan las predicciones
+
+##### d) Imputar faltantes de tipo de propiedad con regresion logistica
+*VARIABLES CATEGORICAS*
+--> Se crea una columna que indica si el tipo de propiedad esta faltante o no 
+--> Se crea una columna binaria llamada "house" que toma el valor 1 si el "Tipo de propiedad" es "house" y 0 si es "apartment"
+--> Se agrega una columna "index" que almacena el índice de cada registro.
+--> Crear subconjunto de datos con y sin valores faltantes de house
+--> Predecir valores de house para los faltantes
+--> Se combinan y se reemplazan los NA
+```{r}
+# Crear una columna que indique si el tipo de propiedad es faltante
+zprop['property_type_miss'] = is.na(zprop$property_type)
+
+# Crear una columna binaria que indique si es una casa (house = 1) o apartamento (house = 0)
+zprop['house'] = as.numeric(zprop$property_type == 'house')
+
+# Agregar una columna "index" que almacena el índice de cada registro
+zprop['index'] = 1:nrow(zprop)
+
+# Crear subconjuntos de datos con y sin valores faltantes en "house"
+zprop_house = zprop %>% select(-property_type, -surface_in_m2_miss, -tc, -floor, -property_type_miss) %>% filter(!is.na(house))
+zprop_house_miss = zprop %>% select(-property_type, -surface_in_m2_miss, -tc, -floor, -property_type_miss) %>% filter(is.na(house))
+
+# Ajustar un modelo de regresión logística para predecir "house"
+model_house = glm(house ~ ., zprop_house %>% select(-index), family = 'binomial')
+
+# Realizar predicciones de "house" para los valores faltantes
+zprop_house_miss['house'] = predict(model_house, zprop_house_miss %>% select(-index), type = 'response')
+zprop_house_miss$house = as.numeric(zprop_house_miss$house > 0.5)
+
+# Combinar los subconjuntos de datos para actualizar "house" en el conjunto original
+zprop_house = rbind(zprop_house, zprop_house_miss)
+zprop = zprop_house %>% select(house, index) %>% right_join(zprop %>% select(-house)) %>% as_tibble() %>% select(-surface_in_m2_miss, -property_type_miss)
+
+# Asignar valores reales a "Tipo de propiedad" y reemplazar "NA" con valores reales
+zprop = zprop %>% mutate(
+  property_type = case_when(
+    house == 1 ~ "house",
+    house == 0 ~ "apartment",
+    TRUE ~ "NA"
+  )
+) %>% select(-index, -house)
+
+zprop$property_type[zprop$property_type == "NA"] = NA
+
+```
+
+##### e) imputar los demas con randomforest
+
+NO ANDA MISS FOREST
+```{r}
+zprop$property_type = as.factor(zprop$property_type)
+zprop <- as.data.frame(zprop)
+missForest_zprop = missForest(zprop)
+missForest_zprop$ximp %>% as_tibble()
+```
+
+#Vinculacion de variables cuantitativas y cualitativas
+
+```{r}
+#Cuantitativa
+zprop$price_aprox_usd
+
+#Cualitativa
+is.na(zprop$price_aprox_usd)
+zprop$surface_in_m2
+
+#Cuantitativa-Cuantitativa
+#Correlacion
+cor.test(zprop$price_aprox_usd,zprop$surface_in_m2)
+#Igualdad de medias
+t.test(zprop$price_aprox_usd,zprop$surface_in_m2)
+ks.test(zprop$price_aprox_usd,zprop$surface_in_m2)
+
+#Cualitativa (el faltante) - Cualitativa (el faltante de otro)
+t1 = table(is.na(zprop$price_aprox_usd),is.na(zprop$surface_in_m2))
+chisq.test(t1)
+
+
+#Cualitativa (el faltante) - Cuantitativa (superficie)
+#1) Separar la variable numerica en N vectores, donde N son las 
+#categor?as que toma la variable cualitativa
+cuanti1 = zprop$surface_in_m2[is.na(zprop$price_aprox_usd)]
+cuanti2 = zprop$surface_in_m2[!is.na(zprop$price_aprox_usd)]
+
+#Ahora puede decidir que test usar
+#Si N=2
+ks.test(cuanti1,cuanti2)
+
+zprop = zprop %>% mutate(
+  sup_discreta = case_when(
+    is.na(surface_in_m2)~"NA",
+    surface_in_m2<60~"chico",
+    surface_in_m2<120~"mediano",
+    T ~ "grande"
+    
+  )
+)
+t2 = table(zprop$sup_discreta,is.na(zprop$price_aprox_usd))
+chisq.test(t2)
+
+```
+
+___________________ . ________________________________________________________
+
+#### Ejercicios Missings y Outliers (ej.18-9). En campus (ejercicios.R)
+
+#2) 
+  a) Detectar missing de la columna "Explicit" 
+  b) Outliers en la columna "duration".
+  b) Missings y Outliers en la columna "year".
+Recuerde:
+Verficar si los outliers refieren a algun dato real o es un faltante
+Verificar si los faltantes son aleatorios o sistematicos.
+Imputar los faltantes con linear regression ? logistical regression seg?n corresponda.
+
+a)
+--> Primero se detecta si el faltante es linealmente dependiente de alguna variable
+Uso REGRESION LINEAL
+
+```{r}
+library(readr)
+library(dplyr)
+spoti<- read_csv("~/ITBA MARIA/3 1Q/Analitica Descriptiva/spotify(1).csv")
+#View(spoti)
+mdet = glm(is.na(explicit)~duration_ms+popularity+energy+key+loudness+speechiness+acousticness+liveness+instrumentalness+valence+tempo, data = spoti, family='binomial')
+mdet %>% summary()
+```
+
+
+#Hay significatividad en "popularity" y "speechiness", se eliminan para la imputacion
+#Modelo de imputacion
+impmodel = glm(explicit~duration_ms+energy+key+loudness+acousticness+liveness+instrumentalness+valence+tempo, data = spoti[!is.na(spoti$explicit),], family='binomial')
+impmodel %>% summary()
+
+#Generacion de imputacion
+impexplicit = exp(predict(impmodel,spoti[is.na(spoti$explicit),]))>0.5
+#Imputacion
+spoti$explicit[is.na(spoti$explicit)] = impexplicit
+
+#b)Deteccion de outliers por:
+#Rango intercuartilico
+boxplot(spoti$duration_ms)
+q <- quantile(spoti$duration_ms, c(0.25, 0.75))
+
+iqr <- q[2] - q[1]
+
+lower <- q[1] - 1.5 * iqr
+upper <- q[2] + 1.5 * iqr
+outliers <- spoti[spoti$duration_ms < lower | spoti$duration_ms > upper,]
+#Por percentil 99
+p99 <- quantile(spoti$duration_ms, 0.99)
+outliers <- spoti[spoti$duration_ms > p99,]
+#Se pasan a minutos para evaluarlos mejor
+spoti['minutes'] = spoti$duration_ms / 60000
+boxplot(spoti$minutes)
+#Los outliers no parecen ser falsos
+
+
+#3) En la base de datos "znorte_properati.csv"
+znorte_properati = read_csv("znorte_properati.csv")
+#a) Repita el ejercicio 1) sobre esta base.
+#b) Estudie los missings y outliers de la variable "price_aprox_local_currency"
+#tip: tenga en cuenta su "conocimiento contextual" (?tipo de cambio implicito?)
+#A) similar al anterior
+#B) Outliers: analisis similar al anterior
+#B)Missings:
+#Los missings, ahora que es una variable numerica
+mdet = glm(is.na(price_aprox_local_currency)~rooms+property_type+surface_in_m2, data = znorte_properati, family='binomial')
+mdet %>% summary()
+#Hay significatividad en "popularity" y "speechiness", se eliminan para la imputacion
+#Modelo de imputacion
+impmodel = lm(price_aprox_local_currency~rooms+property_type+surface_in_m2, data = znorte_properati[!is.na(znorte_properati$price_aprox_local_currency),])
+impmodel %>% summary()
+
+
+#Generacion de imputacion
+impprice = predict(impmodel,znorte_properati[is.na(znorte_properati$price_aprox_local_currency),])
+#Imputacion
+znorte_properati$price_aprox_local_currency[is.na(znorte_properati$price_aprox_local_currency)] = impprice
+
+___________________ . ________________________________________________________
+
+
+# Procesamiento de texto 
+
+### Archivo AT-Amenities
+
+```{r}
+library(tidyverse)
+library(syuzhet)
+library(readr)
+listings <- read_csv("~/ITBA MARIA/3 1Q/Analitica Descriptiva/listings(1).csv")
+```
+
+airbnb<-listings %>% sample_n(100) %>% select(amenities)
+
+Tomo una muestra del listings y **reemplazo por los caracteres que NO quiero que esten**
+```{r}
+airbnb<-listings %>% sample_n(1000)
+cleanFun <- function(htmlString) {
+  #Saco los tags de html
+  t=(gsub("\t","",gsub("\n","",gsub("<.*?>", "",gsub("@","", htmlString)))))
+  #Lo paso a minuscula
+  t=tolower(t)
+  #Le saco los caracteres no alfanumericos
+  t=str_replace_all(t, "[[:punct:]]", " ")   #el punct hace referencia a todos estos caeacteres
+  #: ! ' # S % & ' ( ) * + , - . / : ; < = > ? @ [ / ] ^ _ { | } ~
+  
+  t
+  
+}
+```
+
+Con la funcion limpia, **separo las palabras en vectores de palabras**
+
+```{r}
+extract_amenities<-function(value,amtns){
+  txvector<-unlist(strsplit(value," "))
+  #es necesario el unlist() porque sino despues no se puede buscar
+  #declaro las amenities
+  #Interseccion
+  intrs<-intersect(txvector,amtns)
+  #genero un dataframe vacio para ir poniendo los amenities
+  y<-data.frame(matrix(ncol = length(amtns), nrow = 0))
+  #Le pongo nombre a las columnas
+  #le doy el nombre de las columnas con los amenitiesque agrego
+  colnames(y)<-amtns
+  #Me fijo cuales son los que estan
+  ams<-(amtns%in%intrs)
+  #y lo agrego a mi df de amenities
+  y[1,] = ams
+  y
+}
+
+```
+
+Ahora uso las funciones para mi propio dataset
+```{r}
+amtns<-c("cable","parking","smoke","extinguisher")
+amenities_df<-data.frame(matrix(ncol = length(amtns), nrow = 0))
+colnames(amenities_df)<-amtns
+```
+
+--> Otra forma de hacerlo es con un forloop
+
+```{r}
+for(i in 1:nrow(airbnb)){
+  #limpiar
+  t <- cleanFun(airbnb$amenities[i])
+  adf<-extract_amenities(t,amtns)
+  amenities_df<-rbind(amenities_df,adf)
+
+}
+amenities_df<-ifelse(amenities_df==TRUE,1,0)
+arbnb1<-cbind(airbnb, amenities_df)
+```
+
+### Archivo Crear Dummies
+
+Creo un dataframe de PERROS.Al nombre de la raza, le agrego la palabra raza_ adelante
+```{r}
+library(tidyverse)
+set.seed(400)
+perros <- 
+  data.frame(
+    id = 1:25,
+    peso = round(rnorm(n = 25, mean = 2000, sd = 250), 1),
+    alto  = round(rnorm(n = 25, mean = 30, sd = 10), 1), 
+    Raza = sample(x = c("akita", "beagle", "collie"), size = 25, 
+                  replace = TRUE),
+    Vac = sample(x = c("alfa", "beta"), size = 25, replace = TRUE)
+  )
+
+View(perros)
+colnames(perros)
+
+  perros %>% 
+    mutate(Raza = paste("raza", Raza, sep = "_"))
+```
+
+Ahora creamos una columna llamada valor_raza, que llenamos con unos. 
+Indicamos la presencia de esta variable al convertir la columna raza en *varias dummy* y hacemos lo mismo con la columna vacuna.
+
+Para mantener una columna, se la define como factor.
+  
+```{r}
+  perros %>% 
+    mutate(Raza = paste("raza", Raza, sep = "_"),
+           valor_raza = 1,
+           Vac = paste("vac", Vac, sep = "_"),
+           valor_vac = 1)
+```
+
+Usamos la funcion **spread** para convertir las columnas raza y vac en multiples columnas. Convierte datos altos a datos anchos.
+
+- key es el nombre de la columna que  se usa para nombrar a las nuevas columnas
+- value es el valor que van a tener
+
+--> Cambio los NA por 0 usando el fill
+```{r}
+  perros %>% 
+    mutate(Raza = paste("raza", Raza, sep = "_"),
+           valor_raza = 1,
+           Vac = paste("vac", Vac, sep = "_"),
+           valor_vac = 1
+    ) %>% 
+    spread(key = Raza, value = valor_raza,fill=0) %>% 
+    spread(key = Vac, value = valor_vac,fill=0)
+```
+  
+Puedo usar **fastDummies**
+
+-Nos devuelve un DataFrame que conserva las variables originales
+--> Tenemos que usar select para quitarlas si queremos que eso pase
+```{r}
+library(fastDummies)
+dummy_cols(perros,  select_columns = c("Raza", "Vac")) 
+Perros=  dummy_cols(perros,  select_columns = c("Raza", "Vac")) %>% 
+    select(-c("Raza", "Vac"))
+
+View(Perros)
+```
+
+________________________________Ejercicios.R _______________________________________ 
+
+#### a) Para la base "spotify.csv":
+Vea que la variable "genre" puede tener distintas convinaciones de generos de m?sica,
+por ejemplo: "pop, rock", "pop, country" o "rock, metal"
+Cree 2 columnas adicionales llamadas:
+  #"rock" que tome 1 si la cancion es del genero rock, 0 si no.
+  #"pop"  que tome 1 si la cancion es del genero pop, 0 si no.
+Es decir, extraiga los sub-generos pop y rock de la columna "genre"
+
+
+--> Puedo separar las palabras usando como referencia la , y usando grepl
+```{r}
+library(tidyverse)
+library(readr)
+spoti<- read_csv("~/ITBA MARIA/3 1Q/Analitica Descriptiva/spotify(1).csv")
+View(data)
+
+get_genre = function(df,x){
+  df[x] = grepl(x,df$genre)
+  df
+}
+
+#Hago una columna booleana a ver si esta ese genero o no en genre
+#ej. hip hop, R&B 
+#R&B = TRUE
+spoti = get_genre(spoti,'R&B')
+
+#Tambien lo puedo hacer "a mano"
+spoti['rock'] = grepl('rock',spoti$genre)
+spoti['pop'] = grepl('pop',spoti$genre)
+```
+
+#b) Para la base "znorte_properati.csv":
+#Toma la columna "place_with_parent_names" y separarla en las variables :
+####a.1) "Pais", "Provincia", "Region"
+
+```{r}
+library(readr)
+znorte_properati_1_ <- read_csv("ITBA MARIA/3 1Q/Analitica Descriptiva/znorte_properati(1).csv")
+View(znorte_properati_1_)
+
+l = strsplit(prop$place_with_parent_names,"\\|")
+pais = c()
+provincia = c()
+region = c()
+for(i in l){
+  pais = c(pais,i[2])
+  l1 = strsplit(i[3],' ')
+  provincia = c(provincia,l1[[1]][1])
+  region = c(region,l1[[1]][2])
+}
+prop['pais'] = pais
+prop['provincia'] = provincia
+prop['region'] = region
+
+```
+
+_____________________________________ . ______________________________
+
+# Segundo Parcial Viejo 
+
+
+#NO PUEDO USAR LA BINOMIAL PARA NUMERICAS
+

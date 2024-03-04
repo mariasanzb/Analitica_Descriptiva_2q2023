@@ -1,0 +1,1476 @@
+# Arboles 
+
+### arboles.R
+--> SUPERVISADO (ya hay una clase asignada la cual buscamos predecir en un nuevo dataset)
+--> Modelo (descriptivo o predictivo) que intenta comprender la relacion de las variables x con y que es *categorica*
+--> Algoritmos buenos para poder explicar la particion (porque se separan de esta manera)
+--> Ya tengo las caracteristicas y veo que es lo que hace que esta clase ocurra
+--> Herramienta de prediccion 
+--> Hago preguntas a la base y veo que pasa con esa clasificacion 
+--> Sirve para ver *que variables particionan la clase* (ej. a partir de 86 grados de temperatura corporal ya no son mas mamiferos)
+--> A diferencia del modelo estadistico, este NO explica linearmente por lo cual es mejor 
+--> Explica porque pasa lo que pasa
+
+```{r}
+library(tidyverse)
+library(rpart) #Implementacion de arboles de clasificacion 
+library(rpart.plot) #Graficar esos arboles 
+library(caret) #Utilidades (matriz de confusion)
+library(dplyr)
+install.packages("rpart")
+install.packages("rpart.plot")
+
+library(data.table)
+#library(explore)
+```
+
+Archivo repositorio de vinos 
+
+```{r}
+#Datos
+download.file("https://archive.ics.uci.edu/ml/machine-learning-databases/wine/wine.data", "wine.data")
+# Informacion
+download.file("https://archive.ics.uci.edu/ml/machine-learning-databases/wine/wine.names", "wine.names")
+readLines("wine.data", n = 10)
+vino <- read.table("wine.data", sep = ",", header = FALSE) #Le faltan los nombres
+
+readLines("wine.names", n = 10)
+file.copy(from = "wine.names", to = "wine_names.txt")
+file.show("wine_names.txt")
+
+summary(vino) #No muestra los nombres de cada vino
+nombres <- 
+  readLines("wine_names.txt")[58:70] %>% 
+  gsub("[[:cntrl:]].*\\)", "", .) %>% 
+  trimws() %>% 
+  tolower() %>% 
+  gsub(" |/", "_", .) %>% 
+  # Agregamos el nombre "tipo", para nuestra primera columna con los tipos de vino
+  c("tipo", .)
+
+names(vino) <- nombres
+
+
+vino <- vino %>% 
+  mutate_at("tipo", factor) #Tipo 1 de vino , tipo 2....
+```
+
+1) Creo sets de entrenamiento y de prueba 
+
+Entrenamiento 
+```{r}
+set.seed(1649)
+vino_entrenamiento <- sample_frac(vino, .7) #Uso que el 70% de los datos sea de entrenamiento 
+dim(vino)
+```
+
+Set de prueba (es el 30% restante)
+```{r}
+vino_prueba <- setdiff(vino, vino_entrenamiento)
+dim(vino_entrenamiento)
+dim(vino_prueba)
+```
+
+2) Entreno el modelo usando la funcion *rpart*
+
+--> Formula dice que hay que especificar la variable objetivo que en este caso es el tipo 
+--> Intentamos clasificar el TIPO usando las demas variables predictoras
+--> **Grafico**: 
+               - Cada rectangulo es un nodo con su regla de clasificacion 
+               - Coloreado de acuerdo a categoria mayoritaria de los datos que 
+               agrupa (Categoria (1,2,3 en este caso) que predijo el modelo para el 
+               grupo)
+               - Contenido: Proporcion de casos que pertenecen a esa categoria y del
+               total
+               (ejemplo ultimo rectangulo: la gr?fica tiene 98% de casos en el tipo 
+               1, y 2% en los tipos 2 y  0% del tipo 3, que representan 39% de todos
+               los datos)
+
+```{r}
+arbol_1 <- rpart(formula = tipo ~ ., data = vino_entrenamiento)
+arbol_1 #Cada inciso muestra un nodo y la regla de clasificacion que le corresponde, siguiendo los nodos vemos la clasificacion de las hojas
+rpart.plot(arbol_1) #Grafico 
+```
+
+3) Genero un vector con los valores predichos por el modelo entrenado usando la funcion *predict*
+
+--> Parametro type = class
+```{r}
+#View(vino)
+prediccion_1 <- predict(arbol_1, newdata = vino_prueba, type = "class")
+```
+
+4) Cruzamos la prediccion con los datos reales de nuestro set de prueba para generar
+una **matriz de confusion**, usando confusionMatrix() de caret
+
+```{r}
+confusionMatrix(prediccion_1, vino_prueba[["tipo"]])
+```
+
+5) Genero otro arbol con set de entrenamiento y de prueba diferentes (Uso otro set.seed)
+
+Conclusion:Diferente orden en el cual fueron hechas las particiones pero identico a las variables que usa para separar grupos
+
+```{r}
+#Ejemplo arbol 2
+set.seed(7439)
+vino_entrenamiento_2 <- sample_frac(vino, .7)
+vino_prueba_2 <- setdiff(vino, vino_entrenamiento)
+
+arbol_2 <- rpart(formula = tipo ~ ., data = vino_entrenamiento_2)
+prediccion_2 <- predict(arbol_2, newdata = vino_prueba_2, type = "class")
+rpart.plot(arbol_2)
+confusionMatrix(prediccion_2, vino_prueba_2[["tipo"]])
+
+#Ejemplo arbol 3
+set.seed(8476)
+vino_entrenamiento_3 <- sample_frac(vino, .7)
+vino_prueba_3 <- setdiff(vino, vino_entrenamiento)
+arbol_3 <- rpart(formula = tipo ~ ., data = vino_entrenamiento_3)
+prediccion_3 <- predict(arbol_3, newdata = vino_prueba_3, type = "class")
+rpart.plot(arbol_3)
+confusionMatrix(prediccion_3, vino_prueba_3[["tipo"]])
+```
+
+6) Como elegimos un modelo?
+
+```{r}
+#Relacion entre variables dependientes (tipo) y el resto de las variables que es el conjunto de entrenamiento (en este caso se eligio el ultimo que se uso)\
+
+#cp = Valor mas alto, arbol mas chico (nivel de complejidad)
+#xv = Numero de validaciones cruzadas para la poda (para que no caiga en Overfitting (es decir que sea demasiado especifico),Después de construir un árbol, es común podarlo para evitar que se ajuste demasiado a los datos de entrenamiento y mejore su capacidad de generalización a nuevos datos.)
+#minsplit= numero de observaciones minimas para dividir un nodo 
+
+arbol_3b <- rpart(formula = tipo ~ ., data = vino_entrenamiento_3, control = rpart.control(cp = 0.001, xval = 35, minsplit = 5))
+prediccion_3b <- predict(arbol_3b, newdata = vino_prueba_3, type = "class")
+rpart.plot(arbol_3b)
+
+#Esta función evalúa la precisión del modelo comparando las predicciones (prediccion_3) con las clases reales (vino_prueba_3[["tipo"]]) en el conjunto de prueba
+confusionMatrix(prediccion_3, vino_prueba_3[["tipo"]])
+```
+
+7) Funciones
+```{r}
+crear_sets <- function(datos, proporcion = .7) {
+  sets <- list()
+  
+  sets[["entrenamiento"]] <- sample_frac(datos, proporcion)
+  sets[["prueba"]] <- setdiff(datos, sets[["entrenamiento"]])
+  
+  sets
+}
+
+entrenar_arbol <- function(sets, objetivo, predictores = ".", mi_cp = .01) {
+  if(length(predictores > 1)) {
+    predictores <- paste0(predictores, collapse = "+")
+  }
+  mi_formula <- paste0(objetivo, " ~ ", predictores) %>% as.formula()
+  
+  arbol <- list()
+  arbol[["modelo"]] <- 
+    rpart(data = sets[["entrenamiento"]], formula = mi_formula, 
+          control = rpart.control(cp = mi_cp, xval = 35, minsplit = 5))
+  arbol[["prediccion"]] <- predict(arbol[["modelo"]], sets[["prueba"]], type = "class")
+  arbol[["referencia"]] <- sets[["prueba"]][[objetivo]]
+  
+  arbol
+}
+
+obtener_diagnostico <- function(arbol, objetivo, mi_cp = 0.01) {
+  diagnostico <- list()
+  diagnostico[["matriz"]] <- confusionMatrix(data = arbol[["prediccion"]], 
+                                             reference = arbol[["referencia"]])
+  
+  cp <- with(arbol[["modelo"]], cptable[which.min(cptable[, "xerror"]), "CP"])
+  cp_original <- mi_cp
+  podar <- if(cp < mi_cp) "SI" else "NO"
+  diagnostico[["mincp"]] <- data.frame("CP m?nimo" = cp, "CP original" = cp_original, "Podar" = podar)
+  
+  diagnostico
+} 
+
+crear_arbol <- function(datos, objetivo, predictores = ".", mi_cp = 0.01) {
+  resultado <- list()
+  resultado[["sets"]] <- crear_sets(datos)
+  resultado[["arbol"]] <- entrenar_arbol(resultado[["sets"]], objetivo, predictores, mi_cp)
+  resultado[["diagnostico"]] <- obtener_diagnostico(resultado[["arbol"]], objetivo, mi_cp)
+  
+  resultado
+}
+
+set.seed(1986)
+unarbol <- crear_arbol(vino, "tipo", mi_cp = 0.005)
+
+unarbol[["diagnostico"]]
+```
+
+### ejemolos_arboles.R
+
+Iris
+```{r}
+str(iris)
+summary(iris)
+#iris %>% describe()
+arbol_1 <- rpart(Species~., data=iris, method = "class")
+rpart.plot(arbol_1, main = "?rbol de Clasificaci?n: Flores")
+
+plot(iris$Petal.Length) #Aca puedo ver que es claro que hay una clase
+colnames(iris)
+```
+
+Mtcars
+```{r}
+dim(mtcars)
+#mtcars %>% explore_tbl()
+summary(mtcars)
+#mtcars %>% describe()
+#mtcars %>% 
+  #select(gear, mpg, hp, cyl, am) %>% 
+  #explore_all(target = gear)
+#mtcars %>% 
+  #explore(gear)
+#mtcars %>% 
+  #explore(cyl)
+arbol_2 <- rpart(gear~., data=mtcars, method = "class")
+rpart.plot(arbol_2, main = "?rbol de Clasificaci?n: Cilindros")
+summary(mtcars)
+```
+
+Diabetes (no tengo la base)
+```{r}
+library(readr)
+diabetes <- read_csv("diabetes.csv")
+dim(diabetes)
+diabetes %>% describe()
+arbol_3 <- rpart(Outcome~., data=diabetes, method = "class")
+rpart.plot(arbol_3, main = "?rbol de Resultados de diagnostico")
+```
+
+Lo que importa es que tenemos dos grupos --> Uno puro
+No hay ningun target 0 con glucosa mayor a 128 --> Con glucosa menor a 128 solo hay individuos de target 0
+Bajo esa condicion no hay ningun target 1
+si da mayor a 128 tengo que hacer un test mas exhaustivo a ver a cual pertenece 
+Puede ser que los grupos esten solapeados
+
+-----------------------------------------------------------------------------
+
+# Clusters
+
+--> Tecnica que *divide los datos en grupos*
+--> Modelo NO SUPERVISADO (Los casos que analizamos no tienen clase asignada. La vamos a otorfar luego del analisis de clusters y su asignacion a un grupo)
+--> Agrupo y les asigno una clase (por distancia euclidea)
+--> Describe objetos y relaicones 
+---> Cuanto MAYOR la similitud dentro del grupo y MAYOR la diferencia entre grupos mejor o mas distinta es la agrupacion 
+--> Dos tipos de clustering:
+
+1) **Particional (=KMEDIAS)**: Pleno separador, divide un conjunto de datos en subconjuntos no superpuestos (clusters) de modo que cada objeto este exactamente en un subconjunto. Requieren que se especifiquen los numeros de clusters a utilizar
+- *K-means clustering*:Cada grupo está REPRESENTADO POR EL CENTRO o los medias de los puntos de datos pertenecientes al grupo.
+-*K-medoids o pam*: Cada grupo está representado por UNO DE LOS OBJETOS en el grupo.
+
+
+2) **Jerarquico**: Mido distancia entre uno y otro individuo (se define la distancia). Tengo en cuenta cuandtas distancias estoy dispuesta a asumir entre grupos (elijo la cantidad de grupos). Al permitir que los grupos tengan subgrupos. Se ve como un ARBOL (mas usado, a veces se usa para definir la cantidad de clusters a utilizar)
+
+### clustering.Rmd
+
+* Ver si hay agrupacion subyacente de los estados de Estados Unidos segun los delitos que se cometieron
+
+1) Leo y emprolijo los datos
+```{r}
+library (factoextra)
+library (ggplot2)
+library(cluster)
+data("USArrests")
+head(USArrests)
+datos <- as.data.frame(scale(USArrests)) #Siempre se estandarizan los datos (sensible a outliers)
+set.seed(123)
+datos<- na.omit(datos) #Le saco los NA
+```
+
+2) Matriz de distancia entre las filas (soporta distintas medidas de distancia como por ej. eulidea, pearson, mamhattan, minkowski, etc.)
+
+```{r}
+res.dist <- get_dist(datos, stand = TRUE, method = "pearson")
+fviz_dist(res.dist, 
+   gradient = list(low = "#00AFBB", mid = "white", high = "#FC4E07"))
+```
+
+3) Como identificar la cantidad de clusters?
+--> algoritmos requieren que se les de la *cantidad de clusters que se desean generar*
+
+-Elbow Method
+Aplicar el *algoritmo de K-means* para un rango de valores de K e identificar aquel valor a partir del cual la reducción en la suma total de varianza intra-cluster deja de ser sustancial.
+```{r}
+#Lo muestra como un grafico
+fviz_nbclust(datos, kmeans, method = "wss")+geom_vline(xintercept = 4, linetype = 2)+
+labs(subtitle = "Elbow method")
+```
+
+-NbClust (proporciona *30 indices* para determinar el menjor numero de clusters)
+* Objetivo es identificar el *codo* del grafico que significa que sumar mas clusters no le va a aportar mucho mas valor (ver cuando se desacelera)
+```{r}
+#Ejemplo: 
+#-wss es el metodo para determinar la cantidad de clusters
+#- kmeans es el algoritmo
+#- k.max = numero maximo de clusters
+#-diss= matriz de distancia 
+fviz_nbclust(x = datos, FUNcluster = kmeans, method = "wss", k.max = 15, diss = get_dist(datos, method = "euclidean"), nstart = 50)
+#En este caso serian 4
+```
+
+--> Ver cual de los 30 metodos me hace un agrupamiento optimo
+```{r}
+library("NbClust")
+set.seed(123)
+res.nbclust <- NbClust(datos, distance = "euclidean",
+                  min.nc = 2, max.nc = 10, 
+                  method = "complete", index ="all") #Complete es el metodo de enlace para el clustering jerarquico
+```
+
+*Clustering con k-means (kmedias)(= algoritmo)*
+```{r}
+# Realiza el análisis de clustering con K-medias
+km.res <- kmeans(datos, 4, nstart = 25)
+fviz_cluster(km.res, data = datos, frame.type = "convex")
+
+#Otra manera de graficar que MUESTRA LOS CENTROIDES
+km_clusters <- kmeans(x = datos, centers = 4, nstart = 50)
+fviz_cluster(object = km_clusters, data = datos, show.clust.cent = TRUE,
+             ellipse.type = "euclid", star.plot = FALSE, repel = FALSE) +
+  labs(title = "Resultados clustering K-means") +
+  theme_bw() +
+
+    theme(legend.position = "none")
+
+```
+
+*Cluster PAM*
+```{r}
+library("cluster")
+pam.res <- pam(datos, 4)
+fviz_cluster(pam.res)
+```
+
+*Resumen estadistico por cluster*
+```{r}
+library(dplyr)
+USArrests$cluster <- km_clusters$cluster
+summ<-USArrests%>%
+  group_by(cluster)%>%
+    summarise(Murder = mean(Murder),
+              Assault = mean(Assault),
+              Urbanpop = mean(UrbanPop),
+              Rape = mean(Rape), n = n())
+summ$Murder <-as.integer(summ$Murder)
+summ$Assault <-as.integer(summ$Assault)
+summ$UrbanPop <-as.integer(summ$Urbanpop)
+summ$Rape <-as.integer(summ$Rape)
+summ
+```
+
+*Dendograma (clustering jerarquico)*
+--> Diagrama de arbol parecido 
+--> Visualiza relacion de agrupacion entre los datos 
+--> Observando las sucesivas subdivisiones podemos hacernos una idea sobre los criterios de agrupacion de los mismos, la distancia entre los datos segun las relaciones establecidas, etc
+
+```{r}
+library(ggdendro)
+matrizDistancias <- dist(datos)
+hc2008 <- hclust(matrizDistancias)
+#Grafico jerarquico 
+grafica <- ggdendrogram (hc2008, rotate=TRUE, size=2)
+grafica
+```
+
+Otro grafico mejor de jerarquica
+```{r}
+d <- dist(datos, method = "euclidean")
+res.hc <- hclust(d, method = "ward.D2" )
+grp <- cutree(res.hc, k = 4)
+plot(res.hc, cex = 0.6) # plot tree
+rect.hclust(res.hc, k = 4, border = 2:5) # add rectangle
+```
+
+*Clara (agrupacion hecha para grandes conjuntos de datos)*
+```{r}
+clarax <- clara(datos, 4)
+fviz_cluster(clarax, stand = T, geom = "point",
+             pointsize = 1)
+plot(silhouette(clarax),  col = 2:3, main = "Silhouette plot") 
+#fviz_silhouette(clarax)
+
+#Ver mejor cantidad de agrupacion
+set.seed(123)
+res.nbclust <- NbClust(datos, distance = "euclidean",
+                  min.nc = 2, max.nc = 10, 
+                  method = "complete", index ="all") 
+```
+
+**COMO VER QUE ALGORITMO USAR**
+-->Recuerde que la conectividad debe ser minimizada, mientras tanto el índice de dunn y el ancho de la silueta debe ser maximizada.
+
+Por lo tanto, parece que la agrupación jerárquica supera a los otros algoritmos de agrupación en cada medida de validación, para casi cada número de clusters evaluados.
+
+Independientemente del algoritmo de agrupamiento, el número óptimo de grupos parece ser dos utilizando las tres medidas.
+```{r}
+library("clValid")
+intern <- clValid(datos, nClust = 2:6, 
+              clMethods = c("hierarchical","kmeans","pam",'clara'),
+              validation = "internal")
+# Summary
+summary(intern)
+```
+
+### ejemplos cluster.R
+
+```{r}
+library(dplyr)
+library(cluster)
+library(factoextra)
+library(fpc)
+library(NbClust)
+```
+
+Hace algoritmo y grafica
+```{r}
+str(iris)
+data_iris=scale(iris[,-5])
+set.seed(301020)
+fit_k=kmeans(data_iris,centers = 3) #Data set del iris sin la clase y le pongo 3 agrupamients
+fviz_cluster(object=fit_k,data = data_iris)
+fit_k$centers #Para ver los centros de cada una
+
+#Le saco el escalado a las medias para poder ver la clasificacion mejor.
+#Hago un set con las medias 
+data_iris1=fit_k$centers  #Para ver la media --> Esta escalado 
+data_iris1[,1]=fit_k$centers[,1]+mean(iris$Sepal.Length) 
+data_iris1[,2]=fit_k$centers[,2]+mean(iris$Sepal.Width)
+data_iris1[,3]=fit_k$centers[,3]+mean(iris$Petal.Length)
+data_iris1[,4]=fit_k$centers[,4]+mean(iris$Petal.Width)
+
+summary(data_iris1)  
+data_iris1 #resumen
+
+```
+--> Si hay un encimamiento entee grupos, al agregar variables se pueden separar completamente los grupos. Cuando no hay suficiente distancia se enciman
+--> Cuando las variabels estan muy correlacionadas hago un *INDICE* (se agrupan y se forman una)
+--> Puedo reconocer individuo (a que grupo pertenece) por el largo del petalo haciendo un TEST DE MEDIAS
+
+Agrego la clase al data frame data
+```{r}
+a=as.data.frame(fit_k$cluster) #Lo convierto en data frame porque es lista de listas
+data=cbind(data_iris,a)
+dim(data)
+```
+
+--> Podemos ver si la clusterizacion es correcta porque ya conozco el resultado final (solo aca)
+
+```{r}
+grupo=fit_k$cluster
+res=data.frame(iris,grupo=fit_k$cluster)
+tabla=table(res$grupo,res$Species) #Grupo 2 es setosa, grupo 1 virginica (el mayor numero en columna)
+```
+- Ver que tan bien hizo la asignacion kmeans conociendo el resultado final (hago el porcentaje de las especies correctamente clasificadas)
+```{r}
+TP=tabla[1,1]+tabla[2,3]+tabla[3,2]
+FP=tabla[2,2]+tabla[3,3]
+Accuracy = TP/(TP+FP)*100  #83% de los casos correctamente predichos 
+```
+No da 100% porque en el solapamiento tiende a asignarlos a un grupo o a otro
+Posiblemente puede haber un subgrupo 
+
+
+```{r}
+#No funcionaaaaa
+res=res %>% mutate(grupo=recode(grupo,"2"="virginicas","1"="setosas","3"="versicolors"))
+res_fin=table(res$Species,res$grupo)
+res_fin
+```
+
+--> *Evaluacion de la clusterizacion*
+
+```{r}
+irisclasses= kmeans(data_iris,4)    #object stored in iris class
+str(irisclasses)
+irisclasses$centers
+irisclasses$size
+
+a=irisclasses$tot.withinss #Distancia dentro del grupo
+c=irisclasses$betweenss # la distancia entre grupos
+b=irisclasses$withinss
+b/a
+a/c # quiero grupos lo mas heterogeneos posible hacia afuera 
+    # del grupo y lo mas homogeneo hacia adentro
+```
+
+Grafico de cuantos clusters convienen
+```{r}
+K.max=10
+wss=c()
+for(i in 1:K.max){
+  irisclasses= kmeans(data_iris,i)
+  wss[i] = irisclasses$tot.withinss   #in irisclass,total wss distance allocated 
+}
+plot(1:K.max, wss, 
+     type="b",pch = 12,   #b means both(line,point), pch: specify symbol used along with plot
+     xlab= "Number of clusters",
+     ylab="within ss/ total ss")
+
+```
+
+Otro grafico de cantidad clusters que convienen
+```{r}
+variacion=c(wss[1]-wss[2],wss[2]-wss[3],wss[3]-wss[4],wss[4]-wss[5])
+paso=c(1,2,3,4)
+
+plot(1:length(variacion), variacion, 
+     type="b",pch = 1,
+     xlab= "Number of clusters - 1",
+     ylab="Variacion within ss")
+```
+
+Otro grafico
+```{r}
+wsb=c()
+for(i in 1:K.max){
+  set.seed(301020)
+  irisclasses= kmeans(data_iris,i+1)
+  wsb[i] = (irisclasses$tot.withinss/irisclasses$betweenss)
+}
+plot(1:K.max, wsb, 
+     type="b",pch = 19,   #b means both(line,point), pch: specify symbol used along with plot
+     xlab= "Number of clusters",
+     ylab="between ss/ total ss")
+
+```
+
+Otro grafico usando silhoutte
+```{r}
+set.seed(301020)
+fviz_nbclust(data_iris, kmeans, method = "wss")
+fviz_nbclust(data_iris, kmeans, method = "silhouette")
+```
+
+Regresion logistica
+```{r}
+data_iris=scale(iris[,-5])
+set.seed(301020)
+fit_k=kmeans(data_iris,centers = 3)
+#fviz_cluster(object = fit_k,data = data_iris)
+cluster=fit_k$cluster
+a=as.data.frame(cluster)
+data=cbind(data_iris,a)
+dim(data)
+colnames(data)
+```
+Ejemplo Resgresion Logistica (SUPERVISADO --> ya c las caracteristicas)
+```{r}
+library("nnet")
+library(jmv)
+library("DescTools")
+library(dplyr)
+descriptives(data, vars = vars(cluster) , freq = TRUE)
+data$cluster= as.factor(data$cluster)
+View(data)
+str(data)
+levels(data$cluster)
+
+# Creamos algunas variables
+data=mutate(data,areapetalo= Petal.Width*Petal.Length )
+data=mutate(data,areasepalo= Sepal.Width*Sepal.Length )
+data=mutate(data,ratiosepalo= Sepal.Width/Sepal.Length )
+
+#Regresion logistica multinomial
+glm.cl <- multinom(cluster ~ Sepal.Length + Sepal.Width + Petal.Width + Petal.Length+areapetalo+areasepalo+ratiosepalo, data =data, model=TRUE ) 
+summary(glm.cl)
+
+#Evalua bondad de ajuste del modelo
+PseudoR2(glm.cl, which = c("CoxSnell","Nagelkerke","McFadden"))
+
+
+fitt=fitted.values(glm.cl)
+fitt=as.data.frame(fitt)
+#View(fitt)
+data= cbind(data, fitt)
+dim(data)
+colnames(data)
+View(data)
+#Crea la variable categorica predictora basada en los valores ajustados
+data=mutate(data,categ= ifelse(data$`1`>0.5, 1, ifelse(data$`2`>0.5, 2, 3)))
+View(data)
+#Crea una tabla de contingencia para comparar las categorías reales (cluster) con las categorías predichas (categ).
+table(data$cluster, data$categ)
+
+```
+
+### ejercicio_cluster (24-10)
+
+
+Quiero ver si hay un patron de vinos para identificar los grupos
+Los puedo ubicar en un clust 
+1) agrupamiento
+2) Ver decisiones de agrupamiento (arboles)
+3) De que manera puedo asociar las variables con la decision (regresion logistica) --> Variable mas relevante para particionar
+--> Como estas variables aportan para que vinos pertenezcan a una clase u otra 
+Veo particiones puras y no puras
+
+```{r}
+library(readr)
+WineQT <- read_csv("~/ITBA MARIA/3 1Q/Analitica Descriptiva/WineQT.csv")
+View(WineQT)
+wines <- WineQT[,-1]
+head(wines)
+summary(wines)
+#Objetivo es encontrar informacion que sea para este grupo la mediana es tanto y para el otro grupo la mediana es esto
+str(wines)
+colnames(wines)
+```
+
+1)Hago grafico para ver si hace falta llevar los datos a distribucion normal
+```{r}
+wines %>%
+  gather(attributes, value, 1:12) %>%
+  ggplot(aes(x = value)) +
+  geom_histogram(fill = 'lightblue2', color = 'black') +
+  facet_wrap(~attributes, scales = 'free_x') +
+  labs(x="Values", y="Frequency") +
+  theme_bw()
+```
+
+2) Hago correlacion para ver si me conviene hacer un *INDICE* (ej. hay muchas variables asociadas al color del vino entonces las junto)
+```{r}
+library(corrplot)
+library(ggplot2)
+corrplot(cor(wines), type = 'upper', method = 'number', tl.cex = 0.9)
+cormat <- round(cor(wines),2)
+head(cormat)
+ggplot(wines, aes(x = Phenols, y = Flavanoids)) +
+  geom_point() +
+  geom_smooth(method = 'lm', se = FALSE) +
+  theme_bw()
+ggplot(wines, aes(x = Phenols, y = Malic.acid)) +
+  geom_point() +
+  geom_smooth(method = 'lm', se = FALSE) +
+  theme_bw()
+```
+
+3) Hago el cluster (agrupamiento)
+
+--> Normalizo porque algoritmo se ve afectado por valores extremos
+--> Por default siempre escalo 
+--> Para usar Kmeans tiene que estar SIEMPRE NORMALIZADO
+```{r}
+#Escalamos
+winesNorm <- as.data.frame(scale(wines))
+head(winesNorm)
+set.seed(123)
+#Defino agrupamiento (quiero 2)
+wines_K2 <- kmeans(winesNorm, centers = 2, nstart = 25)
+print(wines_K2)
+fviz_cluster(wines_K2, data = winesNorm) #grafico
+wines_K2$centers #centros ojo que son los ESCALADOS (hay que pasarlos a normal)
+```
+Que hace *kmeans* --> Tira centroides de donde tirar grupos 
+Encuentra valores que minimiza la divergenia dentro de un grupo y maximisa la divergencia entre grupos
+Me da un vector que defina la cantidad (dice en que lugar esta cada uno de los individuos )
+Eso funciona como una clase
+
+
+4) Agrego una variable cluster que tiene el cluster del kmeans.Tengo asignacion en la base original
+```{r}
+wines$cluster=wines_K2$cluster
+View(wines)
+#Analizo los dos grupos por separado
+Wines1=wines[,wines$cluster[wines$cluster==1]]
+Wines2=wines[,wines$cluster[wines$cluster==2]]
+summary(Wines1)
+summary(Wines2)
+```
+
+5) Como elijo el numero de grupos
+- Me hace un resumen
+```{r}
+library("NbClust")
+set.seed(123)
+res.nbclust <- NbClust(wines, distance = "euclidean",
+                       min.nc = 2, max.nc = 10, 
+                       method = "complete", index ="all") 
+```
+
+6) Hago *ARBOLES* para ver como se crearon las clases que hice 
+```{r}
+library(rpart)
+library(rpart.plot)
+wines_K2 <- kmeans(winesNorm, centers = 2, nstart = 25) #2 grupos
+wines$cluster=wines_K2$cluster
+colnames(wines)
+ggplot(data = wines, aes(x = cluster, y = alcohol, color = Proline)) +
+  geom_jitter(width = 0.1) +
+  theme_bw() +
+  theme(legend.position = "null")
+
+arbol_1 <- rpart(cluster~., data=wines, method = "class")
+rpart.plot(arbol_1, main = "?rbol de Clasificaci?n: Vinos") #Plot arbol
+```
+
+--> Trato de entender la particion del arbol que hice
+```{r}
+# hay algo que me ayude enternder esta particion?
+colnames(wines)
+wines$cluster=wines$cluster-1
+
+# Forma de que cada grado adicional de alcohol me diga si es grupo 1 o 2 (en cuanto los aumentos marginales me contribuyen a que sea de un grupo o otro)
+modelo1= glm(cluster~ Alcohol+Acl+Mg ,data = wines)
+summary(modelo1)
+#Que tanto influencia cada variable (ver la significacion )
+```
+
+* Hago con alternativa de 7 grupos (que es la que mejor me habia dado antes)
+```{r}
+#Varia la cantidad de clusters y medidas de distancia (se puede hacer por distintas medidas)
+
+wines_K7 <- kmeans(winesNorm, centers = 7, nstart = 25)
+fviz_cluster(wines_K7, data = wines) # plot cluster
+wines$cluster=wines_K7$cluster
+arbol_7 <- rpart(cluster~., data=wines, method = "class") #plot arbol
+rpart.plot(arbol_7, main = "?rbol de Clasificaci?n: Vinos")
+```
+
+-----------------------------------------------------------------------------
+# PCA (Analisis de componentes principales)
+
+--> Reduccion de la dimension
+--> Simplifica espacios muestrales con muchas dimensiones
+--> Factores que explican aproximadamente lo mismo que las variables originales
+*Principios*
+- No estan correlacionados (son ortogonales)
+- Explica la mayor cantidad de varianza en el dataset
+- Se ordenan por importancia (la primera conserva la mayor estructura) (Combinacion lineal de las variables originales que tienen varianza maxima)
+
+--> Primer autovector: Proyecciones de los datos sobre el vector minimizan la distancia cuadratica 
+
+--> Cuando se calculan los componentes principales (eigenvectors) es posible recuperar de nuevo los valores iniciales haciendo:
+Datos originales = (autovectores)^(-1)*(PC)+medias originales
+
+### Ejericio PCA_pizzas (26-10)
+
+A partir de la base de datos "Pizza.csv" realizar un analisis de componentes principales
+
+1) Evaluar la matriz de correlacion. ?Es un dataset apto para realizar un PCA?
+```{r}
+library(readr)
+library(corrplot)
+library(dplyr)
+pizza <- read_csv("~/ITBA MARIA/3 1Q/Analitica Descriptiva/Pizza.csv")
+#View(Pizza)
+cor(pizza[,3:length(pizza)])
+p1 = pizza[, c("mois", "fat", "ash", "sodium", "carb")]
+corrplot::corrplot.mixed(cor(p1))
+```
+Hay correlacion por lo tanto es un dataset apto para usar PCA
+
+2) Extraer los componentes prinipales usando prcomp(), centrando y esclando los datos
+```{r}
+pca <- prcomp(p1, scale. = T)
+autovectores<-pca$rotation
+autovalores<-pca$sdev
+
+```
+
+3) Analizar el screeplot y los autovalores para determinar la cantidad de componentes a utilizar
+
+```{r}
+#Matriz x --> Datos originales sobre los proyectados 
+cp = pca$x %>% as_tibble() 
+#Grafica la raiz cuadrada de los autovalores --> Te quedas con los primeros 2 porque te explican mas que uno (toman valores mayores a 1)
+screeplot(pca)
+cp['id'] = pizza$id
+cp %>% ggplot()+geom_text(aes(PC1,PC2,label=id)) #Veo el plot de como se agrupan
+pca 
+```
+
+4) Justificar la seleccion de cantidad de componentes e indicar el porcenaje 
+```{r}
+#Porcentaje de varianza explicada
+porcentaje_variabilidad <- pca$sdev^2 / sum(pca$sdev^2)
+
+fviz_pca_var(pca)
+#El gráfico muestra la importancia relativa de cada variable en la formación de los componentes principales
+
+
+library(factoextra)
+fviz_pca_ind(pca, geom.ind = "point", pointshape = 21, 
+             pointsize = 2, 
+             fill.ind = pizza$brand, 
+             col.ind = "black", 
+             palette = "jco", 
+             addEllipses = TRUE,
+             label = "var",
+             col.var = "black",
+             repel = TRUE,
+             legend.title = "Diagnosis") 
+
+```
+
+
+5) Interpretar los resultados en base a las marcas, ?cuales compiten entre s??
+
+Componente principal y vector de marcas y permite visualizar 
+D compite contra B y C --> Se puede ver la interaccion entre si 
+Forma rapida de ver los vinculos entre las variables en forma general 
+
+
+6) Gr?ficar la matriz de rotaciones con las aes(PC1, PC2, color = colname, label = colname) y realizar una interpretacion posible de el significado de los primeros 2 componentes
+```{r}
+library(factoextra)
+
+# Graficar la matriz de rotaciones
+fviz_pca_var(pca, col.var = "contrib", gradient.cols = c("blue", "red"), 
+             repel = TRUE, label = "none") +
+  theme_minimal() +
+  ggtitle("Matriz de Rotaciones: PC1 vs PC2")
+```
+
+Extra (graficos de colores dividiendo medio por marca y otros)
+```{r}
+
+cp['cal']= pizza['cal']
+cp['brand']= pizza$brand
+cp %>% group_by(brand) %>% summarise(pcmean = mean(PC1))
+
+cp %>% mutate(difB = PC1-(-3.07)) %>% filter(brand=='D') %>% arrange(difB)
+
+indice = (cp$PC1-min(cp$PC1))/(max(cp$PC1)-min(cp$PC1))
+boxplot(indice)
+
+cp%>% ggplot()+geom_text(aes(PC1,PC2, label = id, color=brand))#+facet_wrap(~brand)
+
+pca$x %>% as_tibble() %>% ggplot(aes(PC1,PC2))+geom_point()
+
+pca$sdev
+cumpro <- cumsum(pca$sdev^2 / sum(pca$sdev^2))
+
+cor(p1$mois,p1$fat)
+
+```
+
+### PCA_precios
+
+```{r}
+library(readxl)
+precios <- read_excel("~/ITBA MARIA/3 1Q/Analitica Descriptiva/precios.xlsx")
+#View(precios)
+dim(precios)
+cor(precios)
+M <- cor(precios, method = "pearson")
+corrplot(M, method = "ellipse") #Grafico tipo "heatmap" para ver que tanto se relacionan
+```
+
+-->Veo que deberia ser facil encontrar un componente principal que sea muy relevante (estan en azul)
+--> Grafico de elipse --> Si estan altamente correlacionadas hay uno 
+Estoy esperando que las cosas digan mas o menos lo mismo a la hora de hacer un indice 
+Puedo suponer que va a pasar entre las variables 
+Aparecen muchos componentes principales y veo con cual me quedo 
+
+1)Obtengo los componentes principales
+```{r}
+options(scipen=999)
+pca.precio <- prcomp(precios,scale=FALSE) #Uso matriz de covarianzas para obtener los componentes
+plot(pca.precio)
+
+
+pca.precio <- prcomp(precios,scale=T)
+plot(pca.precio)
+```
+
+2)*Matriz de rotacion*
+- Proporciona los loadings de los componentes principales
+- La funcion los denomina matriz de rotacion ya que si multiplicaramos la matriz de datos por datos$rotation, obtendriamos las coordenadas de los datos en el nuevosistema rotado de coordenadas
+- Coordenadas corresponden con los scores de los componentes principales
+
+```{r}
+# Muestra de los primeros 6 elementos del vector de loadings de los 5 primeros componentes
+head(pca.precio$rotation)[, 1:5]
+dim(pca.precio$rotation)
+summary(pca.precio)
+```
+
+Grafico de cuanta varianza captura cada elemento
+```{r}
+fviz_screeplot(pca.precio, addlabels = TRUE, ylim = c(0, 50))
+```
+
+```{r}
+#Grafico de puntos en la nueva dimesion
+fviz_pca_ind(pca.precio, geom.ind = "point", 
+             col.ind = "#FC4E07", 
+             axes = c(1, 2), 
+             pointsize = 1.5) 
+#Circulo con flechas
+fviz_pca_var(pca.precio, col.var = "cos2", 
+             geom.var = "arrow", 
+             labelsize = 2, 
+             repel = FALSE)
+```
+
+Contribucion de las variables a cada dimension
+```{r}
+fviz_contrib(pca.precio, choice = "var", axes = 1, top = 10)
+fviz_contrib(pca.precio, choice = "var", axes = 2, top = 10)
+```
+
+Lineas temporales (?)
+```{r}
+PC1<-PCATotal[,1]
+plot(PC1) # es solo un set de datos para cada registro
+PC2<-PCATotal[,2]
+#datos_recuperados[, 1] <- PC1 + mean(datos$X1)
+plot(precios$p36)
+plot( c(0,40), c(-10,25), type = "n", xlab = "Tiempo",
+      ylab="Efecto", main = "L?neas temporales" )
+# primer Componente ppal
+lines( PC1,
+       lwd = 0.7,
+       lty = 1,
+       col = "black",
+       pch = 1 )
+# p36 - 
+lines( precios$p36, 
+       lwd = 1.5,
+       lty = 2,
+       col = "darkorange1" )
+# p1 - 
+lines( precios$p1,
+       lwd = 1.5,
+       lty = 3,
+       col = "green4")
+# p24 - 
+lines( precios$p24,
+       lwd = 1.3,
+       lty = 3,
+       col = "red")
+# p16 - 
+lines( precios$p12,
+       lwd = 1.3,
+       lty = 3,
+       col = "blue")
+
+```
+
+### PCA - Wisconsin
+
+```{r}
+wdbc<-read.csv("http://archive.ics.uci.edu/ml/machine-learning-databases/breast-cancer-wisconsin/wdbc.data")
+features <- c("radius", "texture", "perimeter", "area", "smoothness", "compactness", "concavity", "concave_points", "symmetry", "fractal_dimension")
+names(wdbc) <- c("id", "diagnosis", paste0(features,"_mean"), paste0(features,"_se"), paste0(features,"_worst"))
+colnames(wdbc)
+View(wdbc)
+```
+
+Filtra quedandose con las columnas que quiere y hace la matriz de correlaciones redondeada a un decimal
+```{r}
+wdbc.pr <- wdbc[c(3:32)]
+summary(wdbc.pr)
+round(cor(wdbc.pr),1)
+```
+
+Hago componentes principales
+```{r}
+wdbc.pr <- prcomp(wdbc[c(3:32)], center = TRUE, scale = TRUE)
+```
+
+Plot de los primeros componentes principales
+```{r}
+screeplot(wdbc.pr, type = "l", npcs = 20, main = "Screeplot of the first 10 PCs")
+abline(h = 1, col="red", lty=5)
+legend("topright", legend=c("Eigenvalue = 1"),
+       col=c("red"), lty=5, cex=0.6)
+```
+
+Cumulative variance plot
+```{r}
+cumpro <- cumsum(wdbc.pr$sdev^2 / sum(wdbc.pr$sdev^2))
+plot(cumpro[0:15], xlab = "PC #", ylab = "Amount of explained variance", main = "Cumulative variance plot")
+abline(v = 10, col="blue", lty=5)
+abline(h = 0.95, col="blue", lty=5)
+```
+
+Porcentaje de varianza explicada
+```{r}
+porcentaje_explicado <- (wdbc.pr$sdev^2) / sum(wdbc.pr$sdev^2) * 100
+plot(wdbc.pr$x[,1],wdbc.pr$x[,2], xlab="PC1 (44.3%)", ylab = "PC2 (19%)", main = "PC1 / PC2 - plot")
+```
+
+Grafico de circulos de colores
+```{r}
+fviz_pca_ind(wdbc.pr, geom.ind = "point", pointshape = 21, 
+             pointsize = 2, 
+             fill.ind = wdbc$diagnosis, 
+             col.ind = "black", 
+             palette = "jco", 
+             addEllipses = TRUE,
+             label = "var",
+             col.var = "black",
+             repel = TRUE,
+             legend.title = "Diagnosis") +
+  ggtitle("2D PCA-plot from 30 feature dataset") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+### PCA- Sectores
+
+
+HACERLOOOO
+
+-----------------------------------------------------------------------------
+# MCA (Analisis de Multi-Correspondencia)
+
+- Para el analisis de *VARIABLES CATEGORICAS*
+- Cada variable categorica tiene un numero k de categorias
+- A cada columna se la fragmenta en nuevas columnas dependiendo cada una de sus categorias (A partir de eso puedo sacar la proporcion que pertenecen a una categoria)
+- Se pondera cada atributo *cuanto menos comun sea mas valioso es* (ej: si los dos comparten una categoria rar como que les gusta comer insectos, la distancia es muy chica y estan mas cerca)
+- Se chequea la INERCIA no la varianza
+- Ejemplo con dataset de hobbies 
+
+
+```{r}
+#Dataset Hobbies
+library(tidyverse)
+library("FactoMineR")
+library("factoextra")
+library(ncpen)
+library(aweSOM)
+library(soc.ca)
+library(readr)
+library(dplyr)
+hobbies <- read_delim("~/ITBA MARIA/3 1Q/Analitica Descriptiva/mca/data_MCA_Hobbies.csv", 
+    delim = ";", escape_double = FALSE, trim_ws = TRUE)
+#View(data_MCA_Hobbies)
+hobbies_sup <- hobbies[, 19:22]
+hobbies = hobbies[,1:18]
+hobbies$TV=as.factor(hobbies$TV)
+```
+
+```{r}
+hobbies %>% View()
+hobbies %>% mutate(
+  Reading_binary = Reading=="y",
+  Cinema_bin = Cinema=="y"
+) %>% ggplot(aes(Reading_binary,TV ))+geom_point()+theme_classic()
+```
+
+Columnas se convierten en dummy variables (columnas originales se convierten en columnas indicadoras)
+```{r}
+hobbies_indicator = as_tibble(sapply(hobbies, to.indicators, exclude.base = F))
+hobbies_indicator <- data.frame(do.call("cbind", hobbies_indicator))
+```
+
+Crea y asigna nuevos nombres de columna a un conjunto de datos (hobbies_indicator) basándose en la columna 'TV' del conjunto de datos original
+```{r}
+colnames_indicator_matrix=c()
+library(dplyr)
+# Seleccionar la columna 'TV' y almacenarla en hobbies_temp
+hobbies_temp <- hobbies['TV']
+colnames_indicator_matrix <- character(0)
+for (i in seq_along(colnames(hobbies_temp))) {
+  # Crear nuevos nombres de columna y agregarlos al vector
+  colnames_indicator_matrix <- c(
+    colnames_indicator_matrix,
+    paste0(colnames(hobbies_temp), "_n")[i],
+    paste0(colnames(hobbies_temp), "_y")[i]
+  )
+}
+print(colnames_indicator_matrix)
+colnames_indicator_matrix=c(colnames_indicator_matrix,"TV_0","TV_1","TV_2","TV_3","TV_4")
+colnames(hobbies_indicator)=colnames_indicator_matrix
+```
+
+```{r}
+#hobbies_indicator=as_tibble(hobbies_indicator) no funciona lol 
+hobbies=as_tibble(sapply(hobbies, as.factor))
+mcah=MCA(hobbies,graph = T)
+mcah$var
+round(mcah$svd$vs**2/sum(mcah$svd$vs**2),3) %>% enframe() %>% 
+  ggplot(aes(name,value))+geom_line()
+
+```
+ PINCHO, EL SEGUNDO EJEMPLO FUNCIONA Y ES MAS CLARO 
+ 
+```{r}
+vote<-read.csv("house-votes-84.names")
+vote <- read_csv("~/ITBA MARIA/3 1Q/Analitica Descriptiva/mca/house-votes-84.csv")
+View(vote)
+
+#Cambio el nombre de las columnas
+colnames(vote)=c("party","handicapped_infants","water_project_cost_sharing",
+                 "adoption_of_the_budget_resolution","physician_fee_freeze",
+                 "el_salvador_aid","religious_groups_in_schools","anti_satellite_test_ban",
+                 "aid_to_nicaraguan_contras","mx_missile","immigration",
+                 "synfuels_corporation_cutback","education_spending",
+                 "superfund_right_to_sue","crime","duty_free_exports","export_administration_act_south_africa")
+#Saco los signos de pregunta por NA y completo los
+vote %>% View()
+vote[vote=="?"]=NA
+vote=vote[complete.cases(vote),]
+
+#Saco la variable categorica (en este caso es party) y hago grafico con mombres en rojp
+#-Este análisis, realizado para todas las variables respecto a las dimensiones nuevas 1 y 2 permite evaluar cuanta variabilidad individual explican las variables nuevas
+
+mca.res.vote=MCA(vote[,2:length(vote)])
+
+#Grafico con puntos celestes y rosas democrat vs republican
+dt = cbind(mca.res.vote$svd$U[,1:4] %>% as_tibble(), vote["party"]) %>% as_tibble() %>% ggplot(aes(V1, V2, col=party))+geom_point()
+
+
+#Puedo juzgar si hizo bien la agrupacion de democrat vs republican
+kmvote = kmeans(mca.res.vote$svd$U[,1:2],2,nstart = 25)
+vote["c"] = kmvote$cluster
+table(vote$c, vote$party)
+
+vote$c[vote$c==1]="democrat"
+vote$c[vote$c==2]="republican"
+mean(vote$c==vote$party) #Porcentaje que me dice que tan bien 
+
+
+summary(mca.res.vote)
+
+#Scree plot (barras con % de la varianza explicada)
+fviz_screeplot(mca.res.vote, addlabels = TRUE, ylim = c(0, 50))
+
+
+#Grafico palabras en arcoiris 
+#- Ver las diagonales para hacer asociaciones por ejemplo
+p1=fviz_mca_var(mca.res.vote,
+                col.var = "contrib", # Color by contributions to the PC
+                gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+                repel = TRUE     # Avoid text overlapping
+                )
+p1
+
+
+
+h3=cbind(vote,mca.res.vote$svd$U[,1:2] %>% as_tibble())
+
+#Plot que ve cuales son democrat y republican (rosa y celeste)
+
+# - Podemos ver centroides tambien
+# - U es una de las matrices resultantes, de dimensiones IxK, cuyas filas están asociadas a los individuos y cada columna es el resultado de la proyección. Si tomamos las dos primeras columnas para representarlas en un gráfico y,  adicionalmente, coloreamos según si esa persona participa en, por ejemplo, jardinería obtenemos este grafico.
+
+ggplot()+geom_point(aes(V1,V2,color=as.factor(party)),alpha=0.95,data=h3)+
+  geom_text(aes(label="Democrat",mean(h3$V1[h3$party=="democrat"]),mean(h3$V1[h3$party=="democrat"])))+
+  geom_text(aes(label="Republican",mean(h3$V1[h3$party!="democrat"]),mean(h3$V2[h3$party!="democrat"])))+
+  geom_hline(yintercept = 0)+geom_vline(xintercept = 0)
+```
+
+# mca2.R
+
+```{r}
+library(readr)
+hobbies<- read_delim("~/ITBA MARIA/3 1Q/Analitica Descriptiva/data_MCA_Hobbies.csv", 
+    delim = ";", escape_double = FALSE, trim_ws = TRUE)
+#View(data_MCA_Hobbies)
+hobbies_sup <- hobbies[, 19:22]
+hobbies = hobbies[,1:18]
+hobbies$TV=as.factor(hobbies$TV)
+any(!complete.cases(hobbies))
+```
+
+Graficos de MCA incluido el Screeplot
+```{r}
+mcah=MCA(hobbies,graph = T)
+fviz_screeplot(mcah)
+```
+
+Autovalores
+```{r}
+mcah$svd$vs
+```
+
+Formula de contribucion de inercia explicada
+```{r}
+round(mcah$svd$vs**2/sum(mcah$svd$vs**2),3)
+```
+
+*Metodo descompocision de matrices singulares*
+- Matriz original termina en 3: 1) Autovalores 2) Matriz U (indivivuos) 3) Matriz V (variables)
+```{r}
+dim(mcah$svd$U) #Matriz U
+dim(mcah$svd$V) #Matriz V
+#Resumen de MCA (se ve el % de variabilidad que tiene cada dimension y todo)
+summary(mcah)
+```
+
+Puedo extraer los componentes a la luz de una variable que ingresa al estudio (ej a ala luz de la variable gardening)
+-Permite interpretar cada dimension en terminos de la variable original
+
+Grafico celeste y rosa
+```{r}
+cp = mcah$svd$U %>% as_tibble()
+h2 = cbind(hobbies,cp)
+h2 %>% ggplot(aes(x=V1,y=V2,color=Gardening))+geom_point(alpha = 0.1)
+#O si quieren visualizar un solo componente principal con la variable
+h2 %>% ggplot(aes(x=0,y=V2,color=Gardening))+geom_point(alpha = 0.1)
+h2 %>% ggplot(aes(x=V1,y=0,color=Gardening))+geom_point(alpha = 0.1)
+```
+
+Yo encontre una serie de planos a los cuales proyectar mi datausando variables principales, que pasa si quiero proyectar datos que no use al mismo plano?
+Si al construir el MCA le paso cuales son suplementarias cualitativas
+y cuantitativas, lo hace la msma funcion
+
+#CHEQUEAR
+```{r}
+mcah= MCA(hobbies,quali.sup=19:22,quanti.sup=23)
+```
+
+Graficos de interpretabilidad
+```{r}
+#Screeplot
+fviz_screeplot(mcah, addlabels = TRUE, ylim = c(0, 20))
+
+#Nombres con categorias
+plot(mcah,invis=c("ind","quali.sup"),col.var=c(rep(c("black","red"),17),"black",rep("red",4)),
+     title="Graph of the active categories")
+#??
+plot(mcah,invisible=c("ind","var"),hab="quali", 
+     palette=palette(c("blue","maroon","darkgreen","black","red")), 
+     title="Graph of the supplementary categories")
+
+#Como explican variabilidad las variables 
+plot(mcah,choix="var",title="Graph of the variables")
+plot(mcah,choix="quanti.sup",title="Graph of the continuous variables")
+#Si quieren calcular la distnacia entre 2 individuos
+```
+
+Calcular la distancia entre dos individuos
+```{r}
+#Seleccionar las variables que si ingresan en el analisis
+hobbies = hobbies %>% select(colnames(hobbies)[1:18])
+hobbies$TV=as.factor(hobbies$TV)
+#Generar la matriz de indicadores
+hobbies_indicator = as_tibble(sapply(hobbies, to.indicators, exclude.base = F))
+hobbies_indicator <- data.frame(do.call("cbind", hobbies_indicator))
+#Calcular la CDT
+pk = colSums(hobbies_indicator)/nrow(hobbies)
+hobbies_indicator_x = as_tibble(t(t(hobbies_indicator)/pk))
+hobbies_indicator_x=hobbies_indicator_x-1
+
+
+complete_disjointed_table = as.matrix(hobbies_indicator_x)
+J=length(colnames(hobbies))
+
+distance_inds = function(i,j){
+  sum((pk/J)*((complete_disjointed_table[i,]-complete_disjointed_table[j,])**2))
+}
+```
+
+### ejercicio_mca.txt y resul_ejercicio_mca
+
+Aplicar un analisis de Componentes Principales y MCA a la base de marcas
+```{r}
+library(arules)
+brand.ratings <- read.csv("http://goo.gl/IQl8nc")
+brand.ratings=brand.ratings[, 1:9]
+View(brand.ratings)
+```
+
+1) Discretizar la base de datos según algun criterio
+-Discretizar: Convertir las continuas en categoricas
+-El código realiza una discretización de las columnas de brand.ratings dividiendo sus valores en tres baldes, convierte esos valores discretizados en factores y agrega la columna 'brand' original al conjunto de datos resultante
+```{r}
+brand.ratings_discr = as_tibble(sapply(brand.ratings,ntile,3))
+brand.ratings_discr = sapply(brand.ratings_discr, as.factor) #convierte a factores
+brand.ratings_discr=as_tibble(brand.ratings_discr)
+brand.ratings_discr["brand"]=brand.ratings$brand
+```
+
+2) Aplicar el analisis de MCA
+```{r}
+mca.res.brand=MCA(brand.ratings_discr)
+```
+
+3) Obtener la variabilidad explicada por los primeros 2 componentes
+```{r}
+fviz_screeplot(mca.res.brand, addlabels = TRUE, ylim = c(0, 20))
+round(mca.res.brand$svd$vs**2/sum(mca.res.brand$svd$vs**2),4)
+```
+
+4) ¿Cuanto de "leader" esta explicado por el primer componente? (miro el R2)
+```{r}
+dt = cbind(mca.res.brand$svd$U[,1:4] %>% as_tibble(), brand.ratings['leader']) %>% as_tibble() #%>% ggplot(aes(V1, V2, col=party))+geom_point()
+corratioV2 = lm(V1~leader, dt) %>% summary()
+corratioV2$adj.r.squared
+
+dt %>% ggplot(aes(x=V1,y=0,col=leader))+geom_point()
+```
+
+5) Obtener el mapa de factores e realizar alguna conclusion respecto a los primeros 2 componentes
+
+Cosas a verque tira el chat GPT:
+- Distancia entre Categorías:
+Categorías cercanas en el mapa de factores son más similares entre sí en términos de asociación con los componentes principales.
+Categorías más alejadas son menos similares.
+
+
+```{r}
+p1=fviz_mca_var(mca.res.brand,
+                col.var = "contrib", # Color by contributions to the PC
+                gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+                repel = TRUE     # Avoid text overlapping
+)
+p1
+
+```
+
+
+-----------------------------------------------------------------------------
+#Analisis Factoreal
+
+--> En PCA busca una variable nueva que sea la combinacion lineal de las variables. Aca hay un factor no observado que causa como las variables se presentan 
+--> "llegas" al valor que toma cada observacion (Como los factores latentes no te pueden explicar todo hay un error)
+
+--> Componente inobservado causado por una comnbinacion lineal de las variables originales (lo observado causa lo no - observado)
+--> *Encontrar factores latentes (no observados) que afectan una o mas variables observables*
+--> No busca la variabilidad de los datos (como en el PCA) sino que busca EXCPLICAR COVARIANZA DE LOS DATOS (factores que explican la variabilidad de combinaciones de datos)
+--> Supone que los factores comunes ("columnas" del dataset) estan estandarizados y los especificos (variabilidad propia de cada variable) tambien. 
+--> Factores comunes NO relacionados a los factores especificos 
+--> Factores comunes se dividen en :
+1) *Factores ortogonal*: Son indepemdientes (cov =0)
+2) *Factores rotado*: No son independientes (cov !=0). Pueden ser ORTOGONALES (preservan independencia de los factores) o OBLICUAS (Introducen correlaciones entre los factores obtenidos)
+
+-->**PASOS**:
+1) Formulacion del problema
+2) Analisis de la matriz de correlacion
+3) Extraccion de factores
+4) Determinacion del numero de factores
+5) Rotacion de factores
+6) Interpretacion de factores 
+7) Validacion del modelo 
+8) a)Calculo puntuaciones factoriales b)Seleccion variables representsarivas
+9) Analisis posteriores: regresion,cluster.....
+
+--> Queremos rotacion para reducir el termino de error ("vas jugando con los grados para que te expliquen mas variabilidad y se reduzca el termino de error")
+
+
+### Ejercicio factor analisis   
+
+Sobre la base de datos Argentina.csv
+
+```{r}
+#install.packages("nFactors")
+#install.packages("ggcorrplot")
+#install.packages("semPlot")
+library(nFactors)
+library(GPArotation)
+library(tidyverse)
+library(ggcorrplot)
+library(semPlot)
+library(psych)
+library(readr)
+argentina<- read_csv("~/ITBA MARIA/3 1Q/Analitica Descriptiva/argentina (1).csv")
+```
+
+1) Evalue si la base de datos es apta para un analisis factorial
+- Si las variables estan correlacionadas mejor
+-#Como referencia, Kaiser puso los siguientes valores en los resultados:
+
+0.00 a 0.49 inaceptable.
+0.50 a 0.59 miserable.
+0,60 a 0,69 mediocre.
+0.70 a 0.79 medio.
+0,80 a 0,89 meritorio.
+0.90 a 1.00 maravilloso.
+
+```{r}
+#Le sacamos el nombre de la provincia
+summary(argentina)
+arg = argentina[,-1]
+arg.nm = argentina[,2:length(argentina)]
+r.mat=(cor(arg))
+
+#Prueba de Barlett para ver si estan correlacionadas o no
+p_esf = cortest.bartlett(cor(arg), n=100)
+p_esf$p
+KMO(cor(arg)) #0.62 mediocre
+ggcorrplot(cor(arg)) #Grafico visualizar la correlacion
+
+```
+
+
+2)?Cuantos factores sugiere el analisis?
+
+Autovalores
+```{r}
+eigens <- eigen(cor(arg))
+eigens$values/sum(eigens$values) 
+(eigens$values/sum(eigens$values)) %>% enframe() %>% ggplot(aes(name,value))+
+  geom_col()
+```
+
+Scree Test
+```{r}
+eigendf = enframe(eigens$values)
+eigendf$random = eigens$values
+
+nS = nScree(r.mat) #Los distintos test sugieren, principalmente, 3 factores
+plotnScree(nS) 
+?nScree
+
+scree(r.mat)
+```
+Sugiere hacerlo con 3 factores
+
+3)Realice la extraccion de factores ortogonales, varimax y oblicuo
+- Como va cargando distinto (como cada uno afecta cada parte)
+- Grafico tipo "arbol"
+
+Oblicuo 
+```{r}
+nfactors=3
+?factanal
+f2 = factanal(arg.nm, factors=nfactors, rotation = 'oblimin',scores="Bartlett")
+factanal(arg.nm, factors=nfactors)
+semPaths(f2, what="est", residuals=FALSE,
+         cut=0.3, posCol=c("white", "darkgreen"), negCol=c("white", "red"),
+         edge.label.cex=0.75, nCharNodes=7)
+
+
+f2 = factanal(arg, factors=nfactors, rotation = 'none',scores="Bartlett")
+```
+
+- default = varimax
+
+```{r}
+# Rotar la matriz
+f3varimax = factanal(arg, factors=nfactors, rotation = 'varimax')
+f3default = factanal(arg, factors=nfactors) # varimax
+
+f3oblimin = factanal(arg, factors=nfactors, rotation = 'oblimin')
+f3none = factanal(arg, factors=nfactors, rotation = 'none',scores="Bartlett")
+
+arg.scores = f2$scores %>% as_tibble() %>% ggplot(aes(Factor1,Factor2))+geom_point()
+```
+
+4)Compare los factores extraidos en cada tecnica
+- Slide 11: En las columnas de factor ver si afectan positiva o negativamente
+- eJ Factor 1 mayor carga sobre precio y calidad (donde mas peso) [Puede ser como el precio impacta cada cosa,el factor precio seria el latente (no existe), factor 1 vinculado al precio porque esta cargado principalmente en las gangas y el valor de uso]
+- ej Factor 2 sobre leader y ... (Factor 2 mas vinculado a la reputacion de la marca)
+
+5)Llegue a una conclusion respecto al analisis
+
+Conclusiones ("a que esta vinculado cada factor")
+- Hay que ver el Overall mca 
+- Diferencia entre el factor 2 y el resto de los factores (Factor 2 relacionado directamente al tamanio porque esta relacionado con el PBI y la poblacions) (Diferencias entre el 3 y el 1 me fijo cual es mayor y cual es menor)
+--> 3 y 1--> En el 3 las mayores cargas en infrastructure (ver variabilidad que explica cada factor, un numero asignado a cada uno)
+--> Muchos tipos como olbimin y none 
+--> Objetivo de la rotacion (cargar mas una variable y menos otra asi quedan mas limpios los factores )
+--> promax otra que se puede probar (distintos modos de rotarlo )
+--> Porque roto? ej. factor 1 no me quede nada del PBI y vaya a otro. Quede "mas limpito el factor"
+--> Costo de rotar el factor: Pierdo independencia entre los factores (correlacion NO es 0 si los roto)
+--> Puede ayudar a resolver la multicolinealidad (genera problemas en los estimadoeres en regresion lineal) 
+--> Cada rotacion carga los factores de una manera distinta
+
+6) Compare con los resultados obtenidos en el ejercicio de PCA para
+#esta misma base
+
+
+### ver factor Analysis . R (visto con Maxi)
+
