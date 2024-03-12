@@ -1,0 +1,281 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+
+# Ejercicio 1
+
+#### 1- Construya una función con dos argumentos, un dataframe/matriz de entrada y un dataframe/matriz de salida. La función deberá devolver un objeto (dataframe/matriz) que contenga en cada columna la cantidad de valores NA que existen en cada columna homónima del dataframe original.
+
+```{r}
+SMP  <- c(10,30, 033, 966, NA)
+CALLENOMBRE  <-  c(4519, NA, NA, 966,966)
+CALLEALTURA  <-  c(4519, NA, 5640, 1418, 966)
+df<-data.frame(SMP,CALLENOMBRE,CALLEALTURA)
+```
+
+```{r}
+
+contar_los_NA<-function(df){
+  filas_df<-dim(df)[1]
+  columnas_df<-dim(df)[2]
+  matriz_nueva<-matrix(0,ncol=columnas_df,nrow=1)
+  data_frame_nuevo<-as.data.frame(matriz_nueva)
+  colnames(data_frame_nuevo) <- colnames(df)
+  vector_suma_na<-numeric(columnas_df)
+  vector_suma_na[]<-0
+    for (i in 1:filas_df){
+    mascara <- is.na(df[i, ])
+    vector_suma_na<-vector_suma_na+as.logical(mascara)
+  }
+ 
+  #Ahora que ya tengo ese vector de los NA, relleno el DF nuevo con esos datos
+  data_frame_nuevo[1,]<-data_frame_nuevo[1,]+vector_suma_na
+  return(data_frame_nuevo)
+}
+
+contar_los_NA(df)
+
+```
+
+# Ejercicio 2
+
+#### a- Haga una función en la que tenga cuatro argumentos, un dataframe de entrada, un dataframe de salida y dos numeros "N" y "n". La función debe extraer "N" muestreos aleatorios de tamaño "n". De cada muestra aleatoria calcule la media, la varianza y la moda e incorpore cada uno de estos resultados en el dataframe de salida que contenga columnas llamadas igual que la base original y que tenga una fila para las medias obtenidas por el sampleo.
+
+```{r}
+library(dplyr)
+
+calcular_moda<-function(vector){
+  valores_unicos<- unique(vector)
+  cantidad<- sapply(valores_unicos, function(val) sum(vector == val, na.rm = T))
+  moda <- valores_unicos[which.max(cantidad)]
+  return(moda)
+}
+
+ejercicio_2<-function(df_entrada,N,n){
+    num_filas <- nrow(df_entrada)
+    num_columnas<-ncol(df_entrada)
+    if (N <= 0 || n >= num_filas) {
+    cat("Los valores de la cantidad de muestras deben ser positivos y el tamanio debe ser menor a la cantidad de filas")
+    return(invisible(0))
+  }
+    matriz_de_salida<-matrix(0,ncol=num_columnas,nrow=N)#mismas lineas como muestreos hago porque pide por                                                         la media
+    data_frame_salida<-as.data.frame(matriz_de_salida)
+    colnames(data_frame_salida) <- colnames(df_entrada)
+  for(i in 1:N){
+    indices_aleatorios <- sample(1:num_filas,n)
+    filas_aleatorias <- df_entrada[indices_aleatorios, ]
+    
+    #Calculo la moda y la varianza de cada columna
+    varianza_por_columna<-apply(filas_aleatorias, 2, var, na.rm = TRUE)
+    moda_por_columna<-sapply(filas_aleatorias,calcular_moda)
+    
+    #Mean de cada columna del muestreo aleatorio y completarlo en el DF nuevo
+    promedio_por_columna<-colMeans(filas_aleatorias, na.rm = TRUE)
+    data_frame_salida[i,]<-promedio_por_columna
+    row_name <- paste("media muestreo", i)
+    rownames(data_frame_salida)[i] <- row_name
+    }
+    return(data_frame_salida)
+}
+
+irisnum<-iris[,-5]
+respuesta_2<-ejercicio_2(irisnum,15,5) 
+respuesta_2
+```
+
+#### b- Del resultado del punto a) haga un resumen estadístico y un histograma para cada variable (construya un grafico multiple con los cuatro histogramas)
+
+
+```{r}
+
+summary(respuesta_2$Sepal.Length)
+summary(respuesta_2$Sepal.Width)
+summary(respuesta_2$Petal.Length)
+summary(respuesta_2$Petal.Width)
+
+par(mfrow = c(2, 2))
+
+hist(respuesta_2$Sepal.Length, col = "plum1", xlim = c(1, 7), ylim = c(0, 8), main = "Media Sepal Length",xlab = "Valor", ylab = "Frecuencia")
+hist(respuesta_2$Sepal.Width, col = "plum4", main = "Media Sepal Width",xlab = "Valor", ylab = "Frecuencia")
+hist(respuesta_2$Petal.Length, col = "plum2", main = "Media Petal Length",xlab = "Valor", ylab = "Frecuencia")
+hist(respuesta_2$Petal.Width, col = "plum3", main = "Media Petal Width",xlab = "Valor", ylab = "Frecuencia")
+
+```
+
+#### c- Modifique la función del punto a) para que el tamaño de la muestra sea aleatorio.
+
+Dentro de la funcion puedo cambiar los "n" por sample(1:15,1) Suponiendo que el tamanio de la muestra puede estar entre 1 y 15
+
+```{r}
+ejercicio_2_c<-function(df_entrada,N){
+    if (N <= 0) {
+    cat("Los valores de la cantidad de muestras N deben ser positivos")
+    return(invisible(0))
+  }
+
+    num_filas <- nrow(df_entrada)
+    num_columnas<-ncol(df_entrada)
+    matriz_de_salida<-matrix(0,ncol=num_columnas,nrow=N)#mismas lineas como muestreos hago porque pide por                                                         la media
+    data_frame_salida<-as.data.frame(matriz_de_salida)
+    colnames(data_frame_salida) <- colnames(df_entrada)
+  for(i in 1:N){
+    indices_aleatorios <- sample(1:num_filas,sample(1:15,1))
+    filas_aleatorias <- df_entrada[indices_aleatorios, ]
+    
+    #Calculo la moda y la varianza de cada columna
+    varianza_por_columna<-apply(filas_aleatorias, 2, var, na.rm = TRUE)
+    moda_por_columna<-sapply(filas_aleatorias,calcular_moda)
+    
+    #Mean de cada columna del muestreo aleatorio y completarlo en el DF         nuevo
+    promedio_por_columna<-colMeans(filas_aleatorias, na.rm = TRUE)
+    data_frame_salida[i,]<-promedio_por_columna
+    row_name <- paste("media muestreo", i)
+    rownames(data_frame_salida)[i] <- row_name
+    }
+    return(data_frame_salida)
+}
+respuesta_2_c<-ejercicio_2_c(irisnum,15)
+respuesta_2_c
+```
+
+# Ejercicio 3: Matrices
+
+#### Installe el paquete "wooldridge" y utilice la base de datos Wage1 corriendo la línea
+
+```{r}
+library(wooldridge)
+base_de_datos <-data("wage1")
+base_de_datos <-wage1
+```
+
+#### Estos son datos de la Encuesta de Población Actual de 1976, recopilada por Henry Farber cuando él y Wooldridge fueron colegas en el MIT en 1988. Haga un help sobre la base y describa de que se trata esta base, que tipo de variables tiene, cuantas variables tiene? Use no mas de tres renglones
+
+```{r}
+library(dplyr)
+help(wage1)
+#Para mostrar tipo de dato de las columnas
+wage1 %>% str()
+```
+
+Se trata de un analisis de la sociedad. Para eso tomo una muestra de 526 observacioens y presento 24 variables que toman valores int (que no aceptan numero decimal) o num (aceptan valor decimal). Muchas variables se usan para ver si pertenecen o no a una categoria (1 o 0).
+
+#### Construya una función que realice la siguiente operación sobre un dataframe, siendo "Y", la primera columna del dataframe (trate que la selección de la variable Y sea uno de los argumentos de la función) y "X" las columnas 2 a 6 del dataframe. Resultado=[inv(transpuesta(X)\*X)]\*[transuesta(X)\*Y]
+
+```{r}
+#Y es el nombre de la columna del Data Frame ingresado por el usuario
+#Esto permite que el usuario seleccione la columna que quiera como la Y, ingresando el nombre como argumento en la funcion 
+
+#Segmento utilizado como input
+wage<-wage1[-c(520:526),]
+
+funcion_ej_3<-function(dataframe,Y){
+  nombre_columnas_df<-colnames(dataframe)
+  if(!(Y %in% nombre_columnas_df)){
+    cat("El nombre de columna",Y, "no existe")
+    return(invisible(0))
+  }
+  else{
+    columna_y <- dataframe[, Y]
+    if (!is.numeric(columna_y)) {
+    cat("La columna", Y, "no contiene valores numéricos")
+    return(invisible(0))}
+    
+    X <- as.matrix(dataframe[, -which(names(dataframe) == Y)])
+    resultado <- solve(t(X) %*% X) %*% (t(X) %*% columna_y)
+    return(resultado)
+  }
+  
+  
+}
+
+funcion_ej_3(wage,"trade")
+```
+
+# Ejercicio 4
+
+#### Haga una función que tome las primeras cuatro columnas s de la base wage (del punto 3 como input) y cree una matriz nueva en la cual, a la matriz original (wage), adicione el cuadrado de cada variable, y las variables centralizadas (variable menos la media) y cada variable estandarizada (variable menos la media y dividido por el desvío estándar)
+
+```{r}
+
+ejercicio_4<- function(data_frame){
+  nueva_matriz<-data_frame[,1:4]
+  columnas_al_cuadrado<-nueva_matriz^2
+  columnas_centralizadas<-nueva_matriz-colMeans(nueva_matriz)
+  columnas_estandarizadas<-scale(nueva_matriz,center = T,scale=T)
+  
+  nombres_originales <- colnames(nueva_matriz)
+  nuevos_nombres <- c(nombres_originales,
+  paste("cuadrado", nombres_originales),
+  paste("centralizado", nombres_originales),
+  paste("estandarizado", nombres_originales)
+  )
+  
+  rta<-cbind(nueva_matriz,columnas_al_cuadrado,columnas_centralizadas,
+             columnas_estandarizadas)
+  colnames(rta) <- nuevos_nombres
+  return(as.matrix(rta))
+  
+}
+
+ejercicio_4(wage)
+```
+
+# Ejercicio 5
+
+#### Cargue en memoria el archivo "netflix.csv" y asignelo a una variable
+
+```{r}
+library(readr)
+netflix <- read_csv("~/ITBA MARIA/3 1Q/Analitica Descriptiva/examen1_2s2023/netflix.csv")
+#View(netflix)
+```
+
+#### a) Cree una columna que indique la duracion total en minutos (hours\*60+minutes)
+
+```{r}
+netflix<-netflix %>% mutate(duracion_minutos=netflix$hours*60)
+View(netflix)
+```
+
+#### b) ¿Cual es el año con mayor duracion promedio? [obtener duracion total promedio con la columna anterior, agrupar por año, calcular la duracion promedio, y ordenar de mayor a menor] ¿cual es el año con mayor variabilidad? [sd(x) calcula el desvio estandar del vector x]Sobre la duración
+
+```{r}
+library(dplyr)
+#Anio con mayor duracion promedio 
+
+anio_duracion_promedio_mas_alta<-netflix %>% group_by(release_year) %>% summarise(duracion_promedio=mean(duracion_minutos,na.rm=T)) %>% arrange(desc(duracion_promedio)) %>% head(1)
+
+anio_duracion_promedio_mas_alta
+
+#Anio con mayor variabilidad
+netflix %>% group_by(release_year) %>% summarise(variabilidad=sd(duracion_minutos,na.rm=T)) %>% arrange(desc(variabilidad)) %>% head(1)
+
+```
+
+#### c) De las peliculas para mayores de 13 anios (maturity U/A 13+), el año de la duracion promedio mas alta, es igual a la poblacion general? [operacion anterior + filtro]
+
+(Asumo que solo es las peliculas mayores a 13 anios, no las mayores a 16 o A o U)
+
+```{r}
+anio_duracion_promedio_mas_alta_filtrado<-netflix %>% filter(maturity_rating== "U/A 13+") %>% group_by(release_year) %>% summarise(duracion_promedio=mean(duracion_minutos,na.rm=T)) %>% arrange(desc(duracion_promedio)) %>% head(1)
+
+anio_duracion_promedio_mas_alta_filtrado
+
+anio_duracion_promedio_mas_alta[1]==anio_duracion_promedio_mas_alta_filtrado[1]
+
+```
+
+# Ejercicio 6 - GGPLOT
+
+#### a) Utilizando GGPLOT, realice un gráfico que permita visualizar la distribución de la duracion calculada en el punto (5.b) por cada "maturity_rating" (puede ser boxplot, histograma, densidad, o el que sea relevante)
+
+```{r}
+library(ggplot2)
+ggplot(netflix, aes(x = duracion_minutos, fill = maturity_rating)) +
+  geom_density(alpha = 0.4) +
+  labs(title = "Grafico de Densidad de Duracion por Maturity Rating",
+       x = "Duracion en minutos)",
+       y = "Densidad") 
+```
