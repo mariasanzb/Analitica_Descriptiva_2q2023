@@ -1,0 +1,385 @@
+#Examen 3
+
+Dataset Students Performance
+```{r}
+
+library(readr)
+df = read_csv("~/ITBA MARIA/3 1Q/Analitica Descriptiva/examen3_2s2023/StudentsPerformanceData.csv") %>% as_tibble()
+#View(df)
+```
+
+Librerias
+```{r}
+library(tidyverse)
+library("ISLR")
+library("MASS")
+library(tidyverse)
+library(factoextra)
+library(FactoMineR)
+library("NbClust")
+library(ggplot2)
+library(corrplot)
+library("FactoMineR")
+library("factoextra")
+library(rpart) #Implementacion de arboles de clasificacion 
+library(rpart.plot) #Graficar esos arboles 
+library(caret)
+```
+
+
+#1) K-medias:
+
+# a) Haga un resumen estadistico para todo el conjunto
+```{r}
+#Veo si hay vacios 
+any(is.na(df))
+summary(df)
+```
+
+# b) Determine la cantidad de agrupamientos optimos, justifique el metodo de seleccion uno visual y uno parametrico
+```{r}
+#Veo si hay outliers, saco las categoricas y estandarizo
+df %>% is.na() %>% colMeans()
+dfi=df[,6:length(df)]
+
+#En la conclusion de este algorimo lo dice parametricamente
+set.seed(123)
+res.nbclust <- NbClust(scale(dfi), distance = "euclidean",
+                       min.nc = 2, max.nc = 10, 
+                       method = "complete", index ="all") 
+
+#Metodo grafico
+set.seed(301020)
+fviz_nbclust(scale(dfi), kmeans, method = "wss")
+fviz_nbclust(scale(dfi), kmeans, method = "silhouette")
+```
+Se concluye que la mejor cantidad de Clusters es 2. 
+
+Se usa el *algoritmo de K-means* para graficar. Toma rango de valores de K (en este caso entre 2 y 10) e identifica aquel valor a partir del cual la reducción en la suma total de varianza intra-cluster deja de ser sustancial.El método de average silhouette considera como número óptimo de clusters aquel que maximiza la media del silhouette coeficient de todas las observaciones, en este caso 2
+
+Uno de los metodos usados es NbClust proporciona *30 indices* para determinar el menjor numero de clusters y devuelve como conclusion cual es la mejor agrupacion. Tiene como op=bjetivo es identificar el *codo* del grafico que significa que al sumar mas clusters no le va a aportar mucho mas valor. Esto sucede cuando el grafico desacelera
+
+# c) Realice un examen estadistico por grupo, comparela con la del conjunto
+```{r}
+#?kmeans
+fit_k <- kmeans(scale(dfi),2, nstart = 25)
+
+#Grafico
+fviz_cluster(object=fit_k,data = scale(dfi))
+
+#Centros
+fit_k$centers #Para ver los centros de cada una (estan escalados asi que los desescalo)
+data_students1=fit_k$centers 
+data_students1[,1]=fit_k$centers[,1]+mean(dfi$math) 
+data_students1[,2]=fit_k$centers[,2]+mean(dfi$reading)
+data_students1[,3]=fit_k$centers[,3]+mean(dfi$writing)
+data_students1[,4]=fit_k$centers[,4]+mean(dfi$history)
+data_students1[,5]=fit_k$centers[,5]+mean(dfi$physics)
+data_students1
+
+
+#Agrego la nueva clase al df a ver si se hizo parecido a Gender 
+a=as.data.frame(fit_k$cluster)
+data=cbind(scale(dfi),a)
+grupo=fit_k$cluster
+res=data.frame(df,grupo=fit_k$cluster)
+tabla=table(res$grupo,res$gender)
+
+#2 seria female y 1 seria male (no agrupo tan bien)
+#Hago porcentaje de los correctamente clasificados 
+
+TP = tabla[1, 1] + tabla[2, 2]  # Asumiendo que 1 representa male y 2 representa female
+FP = tabla[2, 1]
+# Calcular la exactitud (accuracy)
+Accuracy = TP / (TP + FP) * 100
+
+#Comparacion de medias en los distintos clusters
+fviz_cluster(fit_k, data = dfi,show.clust.cent = T)
+dfi['c'] = as.factor(fit_k$cluster)
+dfi %>% group_by(c) %>% summarise_all(mean) %>% View()
+```
+Comparando las medias de los grupos con las de todo el conjunto, vemos que el grupo que aparentemente representa a los male tiene  mayor medias que el grupo que supuestamente representa a las female. Las medias de todo el conjunto sin dividir en dos clusters se aproxima al promedio entre las medias del cluster 1 y el cluster 2. 
+
+
+# d) Genere alguna conclusion respecto a los clusters hallados.
+
+En realacion a los centroides de cada cluster, se puede ver que los centroides de los dos grupos son bastantes parecidos. Es por esto que los clusters en los graficos aparecen muy cercanos hasta casi encimados.
+
+Al ser 2 clusters, en este caso podria asumir que se esta agrupando por la categoria gender del dataset original. Es por esto  que puedo verificsr si se hizo bien o mal la agrupacion en base a este criterio.Basado en la accuracy calculada, que es del 74%, podemos decir que es aceptable aunque a mejorar bastante. 
+
+En cuanto a las medias de los clusters, vemos que en general no difieren mucho y en las variables que mas difieren son principalmente history y reading aun que no se diferencian tanto del resto.
+
+
+-----------------------------------------------------------
+#2) PCA 
+
+#a) Analice la varianza de los datos y las correlaciones
+```{r}
+#Datos sin las categoricas
+datos= df[,6:length(df)]
+var(datos)
+cor(datos) %>%  heatmap()
+corrplot(cor(datos),method = "ellipse")
+```
+PCA se utiliza para la reduccion de la dimension por lo tanto es necesario que haya correlacion para que se pueda hacer. Hay correlaciones altas lo que es bueno. Ademas de con los numeros, esto se puede visualizar en los graficos. 
+
+Al tener variables con alta varianza, es probable que estas contribuyan significativamente a las primeras componentes principales.Esto es positivo ya que contribuyen significativamente a los primeros componentes principales y contengan info valiosa sobre la variabilidad de los datos
+
+#b) Realice un analisis de PCA
+```{r}
+
+pca <- prcomp(datos, scale. = T)
+autovectores<-pca$rotation
+autovalores<-pca$sdev
+summary(pca)
+fviz_screeplot(pca, addlabels = TRUE, ylim = c(0, 90))
+```
+Supuestamente tomo solo el primer autovector porque es el que tiene autovalor mayor a 1.
+
+#c) Calcule la matriz de rotacion y comente para que le sirve la misma
+```{r}
+pca$rotation
+```
+
+La matriz de rotación muestra cuanto está relacionado un componente con las variables, devolviendo el nivel de afectación de cada variable a cada uno de los componentes principales. Las coordenadas corresponden con los scores de los componentes principales
+
+#e) Determine algun uso para los componentes hallados y elija la cantidad de componentes necesarios.
+La cantidad de componentes necesarios es 1. Un uso de estos componentes hallados 
+ es la reducción de dimensionalidad. Esto es util para reducir el perfil de un alumno en, este caso, una sola dimension, y asi facilitar el analisis de comparacion entre alumnos en base a su desempenio por ejemplo.
+ 
+-----------------------------------------------------------
+#3) MCA 
+Realice un analisis de MCA de las variables categoricas de la base de datos
+utilizando el primer componente principal resultante del PCA del punto anterior
+como variable suplementaria
+
+#a) ?Cuanto del segundo componente se explica por "parental level of education"?
+```{r}
+df = read_csv("~/ITBA MARIA/3 1Q/Analitica Descriptiva/examen3_2s2023/StudentsPerformanceData.csv")
+#View(df)
+
+quantity=as.matrix(datos)%*%autovectores[,1]
+#View(quantity)
+
+#Me quedo ahora con las categoricas
+data_cat= df[,1:5]
+#A DATA CAT LE AGREGO LA COLUMNA QUANTITY
+data_cat['quantity']= quantity
+
+mca = MCA(data_cat,graph=T,quanti.sup=6)
+fviz_screeplot(mca,addlabels=T)
+summary(mca) #Resumen que puedo ver el porcentaje explicado de cada dimension
+autovalores<-mca$svd$vs
+matriz_U<-mca$svd$U
+matriz_V<-mca$svd$V
+
+componentes <- mca$svd$U %>% as_tibble() 
+datos2 <- cbind(data_cat,componentes)
+v2comp <- lm(V2 ~ `parental level of education`, data = datos2)%>% summary()
+v2comp $adj.r.squared
+```
+Explica 34%
+
+#b) Caracterizar al estudiante con un primer componente alto. 
+```{r}
+p1=fviz_mca_var(mca,
+                col.var = "contrib", # Color by contributions to the PC
+                gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+                repel = TRUE     # Avoid text overlapping
+)
+p1
+```
+El estudiante con primer componente alto tiende a ser hombre, ser de una etnia del Grupo A o Grupo B pero en menor medida y con un parental level of education de high school o some highschool. 
+
+
+#c) ?Cuantos componentes son necesarios para explicar el 75% de la inercia?
+```{r}
+inercia <-  cumsum(mca$eig[, "percentage of variance"])
+sum(inercia <= 75) + 1
+```
+Son necesarios 9 componentes para explicar la inercia 
+
+#d) Considerando la Tabla Completa Disyuntiva, calcule la distancia entre 2 individuosy comparelos en el plano proyectado, ?se encuentran lejos o cerca entre s??
+```{r}
+data_cat=data_cat[1:5]
+#Solo tiene las variables categoricas del dataet
+#Matriz de indicadores
+#install.packages("FactoMineR")
+library(FactoMineR)
+
+#Convierto variables categoricas en indicadores
+data_indicator <- as_tibble(model.matrix(~ . - 1, data = data_cat))
+
+#Hago la tabla diyuntiva (TCD)
+#TCD muestra la relación entre las categorías de las variables categóricas. La normalización con pk se utiliza para ajustar la importancia relativa de cada categoría.
+pk = colSums(data_indicator)/nrow(data_cat)
+data_indicator_x = as_tibble(t(t(data_indicator)/pk))
+data_indicator_x=data_indicator_x-1
+complete_disjointed_table = as.matrix(data_indicator_x)
+J=length(colnames(data_cat))
+#Funcion de distancia
+distance_inds = function(i,j){
+  sum((pk/J)*((complete_disjointed_table[i,]-complete_disjointed_table[j,])**2))
+}
+
+# Coordenadas de los individuos en el espacio MCA
+
+distance_inds(1,2)
+
+#Grafico
+mca <- MCA(data_cat, graph = FALSE)
+coordenadas <- as_tibble(mca$ind$coord[, 1:2])  # Tomar solo las primeras dos dimensiones
+individuo1 <- coordenadas[1, ]
+individuo2 <- coordenadas[2, ]
+distancia <- sqrt(sum((individuo1 - individuo2)^2)) #Euclidea
+# Visualización en el plano proyectado
+plot(coordenadas, col = "lightgrey", pch = 19, main = "Proyección en el Plano MCA")
+points(individuo1[1], individuo1[2], col = "darkorchid", pch = 19)
+points(individuo2[1], individuo2[2], col = "orange2", pch = 19)
+# Línea entre los dos individuos
+lines(c(individuo1[1], individuo2[1]), c(individuo1[2], individuo2[2]), col = "black", lty = 2)
+# Etiquetas
+text(individuo1[1], individuo1[2], labels = "Individuo 1", pos = 2, col = "darkorchid")
+text(individuo2[1], individuo2[2], labels = "Individuo 2", pos = 4, col = "orange2")
+
+```
+
+Podemos ver que se encuentran cerca entre si. 
+
+-----------------------------------------------------------
+#4) Arboles
+#Realice un analisis de arboles de decision con hasta 5 variables independientes utilizando "test preparation course" como variable dependiente
+
+- Explica la particion de porque se separa de esa manera
+- test preparatiom course es la que va a explicar
+
+#a) Realice el grafico del arbol
+```{r}
+data= read_csv("~/ITBA MARIA/3 1Q/Analitica Descriptiva/examen3_2s2023/StudentsPerformanceData.csv")
+data_ind=data[,5:10]
+
+#Hago el grafico de arbol
+set.seed(8476)
+data_entrenamiento<- sample_frac(data_ind, .7) #70% para el entrenamiento
+data_prueba <- setdiff(data_ind, data_entrenamiento)
+arbol <- rpart(`test preparation course` ~ ., data = data_entrenamiento)
+rpart.plot(arbol)
+
+```
+
+
+#b) Utilice el grafico para realizar un analisis descriptivo 
+Esta viendo si las notas que se sacaron en los extratos de math, reading, writing, physics y history pueden llevar a la conclusion de que hizo o no el "test preparation course". 
+
+Por ejemplo podemos ver que las personas que se sacaron mas de 85 en writting, es 13% probable que hayan hecho el curso de preparacion. Tambien podemos ver que los que tienen un writting menor a 49 es tienen 11% de probabilidad de no haber realizado el curso. Este grafico sirve para ver la efectividad de haber realizado el curso de preparacion.
+
+
+#c) ?Que metodo utiliza el arbol para optimizar?
+
+Se usa "Hunts Algorithm" que sirve para construir redes con estructuras en forma de arbol. Este algoritmo divide los datos para que minimice la impureza en los subconjuntos resultantes. Es util para explicar la particion de una clase que ya existe viendo porque los datos se separan de esta manera. Ya se tienen las caracteristicas y se ve que es lo que hace que esta clase ocurra. Puede estar relacionado con CART (Arboles de clasificacion y regresion).
+
+-----------------------------------------------------------
+#5) An?lisis factorial
+
+Usando la base datos_factorial.xlsx
+```{r}
+datos_factorial <- read_excel("~/ITBA MARIA/3 1Q/Analitica Descriptiva/examen3_2s2023/datos_factorial.xlsx")
+#View(datos_factorial)
+```
+
+#a) Describa los pasos para realizar un analisis factorial
+1) Formulacion del problema
+2) Analisis de la matriz de correlacion
+3) Extraccion de factores
+4) Determinacion del numero de factores
+5) Rotacion de factores
+6) Interpretacion de factores 
+7) Validacion del modelo 
+8) a)Calculo puntuaciones factoriales b)Seleccion variables representsarivas
+9) Analisis posteriores: regresion,cluster.....
+
+
+#b) Cual es la hipotesis nula del test de esfericidad de Barlett y para que sirve en el analisis factorial
+
+En el analisis factorial es necesario evaluar si la base de datos es apta o no para este analisis. El test de Barlett se hace sobre la matriz de correlacion de los datos. Si el test de Barlett rechaza la hipótesis nula, significa que existe correlación entre al menos algunas de las variables. En este caso, el análisis factorial es apropiado, ya que tiene sentido buscar factores subyacentes si las variables están correlacionadas.
+
+La hipotesis nula en cueestion es
+H0:Todas las variables incluidas en el análisis factorial no estan correlacionadas en la poblacion
+
+#c) Explique el test KMO y MSA
+
+El *KMO* sirve para evaluar la varianza de las variabeles que puede ser atribuida a factores subyacentes. Una puntuacion mayor a 1 indica mejor adecuacion de los datos al analisis factorial. 
+
+Como referencia, Kaiser puso los siguientes valores en los resultados:
+
+0.00 a 0.49 inaceptable.
+0.50 a 0.59 miserable.
+0,60 a 0,69 mediocre.
+0.70 a 0.79 medio.
+0,80 a 0,89 meritorio.
+0.90 a 1.00 maravilloso.
+
+El *MSA* es el numero que define el KMO que puede entrar en una de esas categorias segun su resultado
+
+
+Medidas pruebas psicologicas para ninios
+#En este ejercicio se utiliza en an?lisis factorial para sobre la base de un subconjunto de variables que forman parte de un estudio cl?sico de Holzinger y Swineford (1939), que consisten en medidas de 24 pruebas Psicol?gicas para 145 Ni?os del ?rea de Chicago que asisten a la escuelaGrant-White. 
+
+#Trabajaremos con un subconjunto formado por de siete de las 24 variables:
+#VISUAL (percepci?n visual)
+#CUBOS (relaciones espaciales), 
+#PARRAFO (comprensi?n de p?rrafo)
+#ORACI?N (completar oraci?n), 
+#WORDM (significado de la palabra)
+#PAPER1 (formas de papel) y 
+#FLAGS1 (visualizaci?n de formas).
+
+#1) Determine la cantidad de factores
+```{r}
+#Autovalores
+eigens <- eigen(cor(datos_factorial))
+autovalores<-eigens$values
+proporc_varianza<-eigens$values/sum(eigens$values) 
+(eigens$values/sum(eigens$values)) %>% enframe() %>% ggplot(aes(name,value))+
+  geom_col()
+
+#Scree test para ver cantidad de factores
+r.mat=(cor(datos_factorial))
+eigendf = enframe(eigens$values)
+eigendf$random = eigens$values
+nS = nScree(r.mat) 
+plotnScree(nS) 
+```
+Los test sugieren principalmente 2 factores
+
+
+
+#2) De una breve descripcion de que esta contando cada factor, asignele un nombre a cada factor
+```{r}
+# Primeros 3 factores
+loadings <- eigens$vectors[, 1:2]
+loadings_df <- as.data.frame(loadings) #Lo paso a un DF
+rownames(loadings_df) <- colnames(datos_factorial)
+loadings_df
+
+```
+El factor 1 tiene una mayor carga sobre PARAGRAPHS, SENTENCE y WORDS por lo que esta vinculado a las habilidades del estudiante con la escritura. Un nombre para asignarle es "ESCRITURA"
+
+El factor 2 tiene un mayor peso en PAPER1 y CUBES por lo que esta vinculado a las habilidades menos duras del estudiante y mas con su relacion fisica con los objetos. Un nombre para asignarle es "HABILIDADES ESPACIALES"
+
+
+
+#3) Extraiga los factores y grafiquelos
+```{r}
+#Extraccion de facotores oblicuo
+nfactors=2
+f2 = factanal(datos_factorial, factors=nfactors, rotation = 'oblimin',scores="Bartlett")
+factanal(datos_factorial, factors=nfactors)
+semPaths(f2, what="est", residuals=FALSE,
+         cut=0.3, posCol=c("white", "darkgreen"), negCol=c("white", "red"),
+         edge.label.cex=0.75, nCharNodes=7)
+
+
+```
+
+
