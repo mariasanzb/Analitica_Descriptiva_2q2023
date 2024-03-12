@@ -1,0 +1,357 @@
+#1) Genere  interrogante que pueda ser contestado con esos datos que vincule:
+
+#En todos los casos:
+#1.Que las hipotesis planteadas tengan un hilo conductor, sobre el cual se puede llegar a alguna conclusión
+#usando las 3 hipotesis.
+#2.Escriba la hipotesis
+#3.Seleccione el test adecuado e indique por qué lo eligió.
+#4.Realice el test.
+#5.Interpretelo.
+#6.(Opcional) En cada analisis, realice un previo analisis gráfico relevante para adelantar alguna conclusion
+
+```{r}
+library(readxl)
+library(dplyr)
+data <- read_excel("C:/Users/maria/Documents/ITBA MARIA/3 1Q/Analitica Descriptiva/examen2-2s2023/datos_perforaciones.xlsx")
+#View(data)
+#colnames(data)
+```
+
+El hilo conductor va a ser buscar la *eficiencia de la empresa*.
+
+#a) Dos variables numericas
+
+Queremos ver si hay una relacion entre la *potencia de los equipos y el agua inyectada*. Queremos probar que al aumentar la potencia, es necesario inyectar menos agua lo que indicaria menos gasto en la misma. Deberia haber una correlacion negativa entre las mismas
+
+1. Hipotesis coloquial: Cuanta mas potencia tengan los equipos,se necesita menos agua inyectada
+   Hipotesis formal: Existe una correlacion negativa entre "agua_inyectada_m3" y    potencia_equipos_fractura_hp"
+   
+   H0:No existe una correlacion significativa entre el agua inyectada y la potencia
+   H1:Existe una correlacion significativa entre el agua y la potencia.
+   
+2. Test de correlacion de Pearson: Quiero evaluar la linealidad entre estas dos variables, pero no evaluo monotomia, ya que espero que cuando la presion suba el agua inyectada baje, por lo tanto uso Pearson y no Spearman. 
+
+3.Test
+```{r}
+cor.test(data$agua_inyectada_m3,data$potencia_equipos_fractura_hp, method = 'pearson')
+```
+4. El p-valor es de 0.1993 por lo tanto no se rechaza la H0 por lo que no se puede afirmar que exista dicha relacion entre las variables.
+
+#b) Una categorica y una numerica
+
+Se quiere evaluar si la *potencia* necesaria para llevar a cabo la extraccion varia dependiendo la *cuenca* en la que se realiza. Con este fin, si hay variacion, significa que hay zonas que son potencialmente "mas economicas" ya que requieren menos energia. 
+
+- Para guiarme, hago un grafico con las medias en potencia de cada cuenca
+
+```{r}
+library(ggplot2)
+data_means <- data %>% 
+  group_by(cuenca) %>%
+  summarize(Media_Potencia = mean(potencia_equipos_fractura_hp))
+ggplot(data_means, aes(x = cuenca, y = Media_Potencia)) +
+  geom_bar(stat = "identity", fill = "lightpink") +
+  labs(x = "Cuenca", y = "Media de Potencia") +
+  ggtitle("Medias de Potencia por Cuenca")+scale_y_continuous(limits = c(0, 100000))
+
+```
+
+1. Hipotesis coloqual: Las extracciones en la cuenca AUSTRAL suelen requerir mas presion 
+   Hipotesis formal: El promedio de la potencia necesaria en las extracciones (potencia_equipos_fractura_hp) es mayor en la cuenca austral (cuenca=Austral)
+   
+   H0:El promedio de la potencia necesaria en todas las cuencas es igual
+   H1:El promedio de potencia necesario en la cuenca AUSTRAL es mayor al de las demas cuencas
+
+2. Test T de Student: Es para hacer igualdad de medias y vincula una categorica con una numerica
+
+3.Test
+```{r}
+data_AUSTRAL <- data %>% filter(cuenca == "AUSTRAL")
+data_Otras_Cuencas <- data %>% filter(cuenca != "AUSTRAL")
+t.test(data_AUSTRAL$potencia_equipos_fractura_hp, data_Otras_Cuencas$potencia_equipos_fractura_hp)
+```
+Como el p-valor es de 2.17e-06, se rechaza H0 por lo que se concluye que, en promedio la cantidad de potencia necesaria para la cuenca de la Austral es,en promedio, mayor.
+
+
+#c) Dos categoricas
+
+Discretizando la variable cantidad_facturas, puedo comparar la relacion entre la *cuenca y la cantidad de fracturas*. Quiero ver si hay cuencas que requieren de una mayor o menor cantidad de fracturas lo que esta relacionado con la optimizacion de la produccion.
+
+```{r}
+intervalos <- cut(data$cantidad_fracturas, breaks = c(0, 10, 20, 30, 40, 87), 
+                   labels = c("1-10", "11-20", "21-30", "31-40", "41-87"),
+                   right = TRUE)
+data$fracturas_discretizadas <- intervalos
+#View(data)
+```
+
+- Para anticiparme puedo ver el siguiente grafico
+```{r}
+ggplot(data, aes(x = cuenca, fill = fracturas_discretizadas)) +
+  geom_bar(position = "dodge") +
+  labs(x = "Cuenca", y = "Número de Pozos") +
+  ggtitle("Relación entre Cuenca y Cantidad de Fracturas Discretizadas") +
+  scale_fill_brewer(palette = "Set7")  # Personaliza la paleta de colores si lo deseas
+```
+
+1. Hipotesis coloqual:Es independiente si la cuenca es AUSTRAL, GOLFO SAN JORGE o NEUQUINA para saber a que rango de fracturas pertenecen
+   Hipotesis formal: Las fracturas realizadas son independientes a la cuenca 
+   
+   H0:Hay independencia entre la cuenca y el rango de fracturas al que pertenecen
+   H1:No hay independencia entre la cuenca y el rango de fracturas al que pertenecen
+
+2. Test Chi-Cuadrado: 
+
+3.Test
+```{r}
+# Crear una tabla de contingencia
+tabla_contingencia <- table(data$cuenca, data$fracturas_discretizadas)
+chi_sq_test_result <- chisq.test(tabla_contingencia)
+print(chi_sq_test_result)
+```
+El p-valor es < 2.2e-16 por lo tanto se rechaza H0 lo que nos lleva a concluir que no hay independencia entre la cuenca y el rango de fracturas al que pertenecen 
+
+-----------------------------------------------------------------------------------------------------
+
+# 2) Generar las variables "tipo de reservorio" y "subtipo_reservorio" de la columna "tipo_y_subtipo_reservorio",
+# dado que el tipo y subtipo esta divido por el caracter "/"
+
+```{r}
+library(readxl)
+datos_perforaciones <- read_excel("C:/Users/maria/Documents/ITBA MARIA/3 1Q/Analitica Descriptiva/examen2-2s2023/datos_perforaciones.xlsx")
+#View(datos_perforaciones)
+```
+
+Ejemplo de lo que esta escrito: 	NO CONVENCIONAL/SHALE
+Completar con NA
+Puede no tener subtipo y puede tener ambos vacios 
+No puede haber un subtipo sin un tipo 
+
+Chequear estas lineas para el buen funcionamiento
+790 y 846
+
+```{r}
+l <- strsplit(datos_perforaciones$tipo_y_subtipo_reservorio, "/")
+tipo_reservorio <- c()
+subtipo_reservorio <- c()
+
+for (i in l) {
+  if (length(i) == 2) {
+    tipo_reservorio <- c(tipo_reservorio, i[[1]])
+    subtipo_reservorio <- c(subtipo_reservorio, i[[2]])
+  } else {
+    if (i[[1]] == "") {
+      tipo_reservorio <- c(tipo_reservorio, NA)
+      subtipo_reservorio <- c(subtipo_reservorio, NA)
+    } else {
+      tipo_reservorio <- c(tipo_reservorio, i[[1]])
+      subtipo_reservorio <- c(subtipo_reservorio, NA)
+    }
+  }
+}
+
+datos_perforaciones$tipo_reservorio <- tipo_reservorio
+datos_perforaciones$subtipo_reservorio <- subtipo_reservorio
+
+View(datos_perforaciones)
+```
+-----------------------------------------------------------------------------------------------------
+
+# 3) Missings:
+## a) Los faltantes de "subtipo_reservorio", ¿dependen de las variables numericas?
+
+```{r}
+
+#install.packages("naniar")
+library(naniar)
+library(dplyr)
+
+#Verificar que hay NA
+anyNA(datos_perforaciones$subtipo_reservorio)
+
+#Hago un subset solo con las variables numericas
+idx <- which(sapply(datos_perforaciones, class) %in% c("numeric","integer"))
+n_perforaciones <- datos_perforaciones[, idx]
+
+#Test de regresion lineal para hacer sobre todos los numericos - Veo si es linearmente dependiente de alguna variable numerica los missings en subtipo_reservorio_isna
+dependencia_missings <- glm(is.na(subtipo_reservorio) ~longitud_rama_horizontal_m + arena_bombeada_nacional_tn + arena_bombeada_importada_tn + agua_inyectada_m3 + co2_inyectado_m3 + presion_maxima_psi + potencia_equipos_fractura_hp,data = n_perforaciones, family = 'binomial')
+summary(dependencia_missings)
+```
+
+Tomadas en cuenta las variables numericas las del tipo numerico pero excluyendo los anios y meses y los id (ya que no parecen relevante al analisis) se encontro que los faltantes dependen de las variables numericas:
+- longitud_rama_horizontal
+-arena_bombeada_importada_tn
+presion_maxima_psi  
+
+
+#b)¿dependen de la empresa informante?
+
+Puedo usar test de hipotesis de Chi-Cuadrado teniendo en cuenta que:
+H0:Las dos variables son independientes
+H1: Hay una dependencia entre las variables
+
+```{r}
+t1 = table(is.na(datos_perforaciones$subtipo_reservorio),datos_perforaciones$empresa_informante)
+chisq.test(t1)
+```
+El p-valor da un valor menor a 0.05 por lo tanto se rechaza la hipotesis nula y se concluye que los valores faltantes dependen tambien de la empresa informante.
+
+
+#c) Impute faltantes
+
+Voy a tener que usar *regresion logistica* porque los faltantes son del tipo categorico. Primero mec fijo que subtipos reservorio hay. Hay solo "SHALE" y "TIGHT"
+
+```{r}
+subtipos_unicos <- unique(datos_perforaciones$subtipo_reservorio)
+```
+
+Ahora imputo los faltanes:
+
+NO FUNCIONA 
+```{r}
+# Crear una columna que indique si el tipo de propiedad es faltante
+datos_perforaciones['datos_perforaciones_missing'] = is.na(datos_perforaciones$subtipo_reservorio)
+
+# Crear una columna binaria que indique si es una SHALE (shale = 1) o tigth (shale = 0)
+datos_perforaciones['shale'] = as.numeric(datos_perforaciones$subtipo_reservorio== 'SHALE')
+
+# Agregar una columna "index" que almacena el índice de cada registro
+datos_perforaciones['index'] = 1:nrow(datos_perforaciones)
+
+# Crear subconjuntos de datos con y sin valores faltantes en 'shale'
+colnames(datos_perforaciones)
+View(datos_perforaciones)
+
+datos_perforaciones_subconjunto <- datos_perforaciones %>%
+  select(
+    "id_base_fractura_adjiv", "idpozo", "sigla", "cuenca", "areapermisoconcesion",
+    "yacimiento", "formacion_productiva", "tipo_y_subtipo_reservorio",
+    "longitud_rama_horizontal_m", "cantidad_fracturas", "tipo_terminacion",
+    "arena_bombeada_nacional_tn", "arena_bombeada_importada_tn",
+    "agua_inyectada_m3", "co2_inyectado_m3", "presion_maxima_psi",
+    "potencia_equipos_fractura_hp", "fecha_inicio_fractura", "fecha_fin_fractura",
+    "fecha_data", "anio_if", "mes_if", "anio_ff", "mes_ff", "anio_carga", "mes_carga",
+    "empresa_informante", "mes", "anio","datos_perforaciones_missing","index","shale"
+  ) %>%filter(!is.na(datos_perforaciones$shale))
+
+#View(datos_perforaciones_subconjunto_missings)
+
+datos_perforaciones_subconjunto_missings<-datos_perforaciones %>%
+  select(
+    "id_base_fractura_adjiv", "idpozo", "sigla", "cuenca", "areapermisoconcesion",
+    "yacimiento", "formacion_productiva", "tipo_y_subtipo_reservorio",
+    "longitud_rama_horizontal_m", "cantidad_fracturas", "tipo_terminacion",
+    "arena_bombeada_nacional_tn", "arena_bombeada_importada_tn",
+    "agua_inyectada_m3", "co2_inyectado_m3", "presion_maxima_psi",
+    "potencia_equipos_fractura_hp", "fecha_inicio_fractura", "fecha_fin_fractura",
+    "fecha_data", "anio_if", "mes_if", "anio_ff", "mes_ff", "anio_carga", "mes_carga",
+    "empresa_informante", "mes", "anio","datos_perforaciones_missing","index","shale"
+  ) %>%filter(is.na(datos_perforaciones$shale))
+
+
+# Ajustar un modelo de regresión logística para predecir "shale"
+model_shale <- glm(shale ~ ., data = datos_perforaciones_subconjunto %>% select(-index), family = 'binomial', maxit = 1000)
+
+# Realizar predicciones de "shale" para los valores faltantes
+datos_perforaciones_subconjunto_missings['shale'] = predict(model_shale,datos_perforaciones_subconjunto_missings %>% select(-index), type = 'response')
+datos_perforaciones_subconjunto_missings$shale = as.numeric(datos_perforaciones_subconjunto_missings$shale > 0.5)
+
+levels(datos_perforaciones_subconjunto$sigla)
+
+
+# Combinar los subconjuntos de datos para actualizar "house" en el conjunto original
+datos_perforaciones_subconjunto = rbind(datos_perforaciones_subconjunto,datos_perforaciones_subconjunto_missing)
+datos_perforaciones = datos_perforaciones_subconjunto %>% select(shale, index) %>% right_join(datos_perforaciones %>% select(-shale)) %>% as_tibble() %>% select(-datos_perforaciones_missings)
+
+# Asignar valores reales a "subtipo_reservorio" y reemplazar "NA" con valores reales
+datos_perforaciones = datos_perforaciones %>% mutate(
+  subtipo_reservorio = case_when(
+    shale == 1 ~ "SHALE",
+    shale == 0 ~ "TIGHT",
+    TRUE ~ "NA"
+  )
+) %>% select(-index, -shale)
+
+datos_perforaciones$subtipo_reservorio[datos_perforacioes$subtipo_reservorio == "NA"] = NA
+```
+
+Otra forma de imputacion:
+
+*Imputacion unica del arbol de decision (KNN)*
+
+```{r}
+library(RANN)
+library(caret)
+anyNA(datos_perforaciones)
+preProcess_missingdata_model <- preProcess(as.data.frame(datos_perforaciones) , method='knnImpute')
+preProcess_missingdata_model
+```
+
+
+-----------------------------------------------------------------------------------------------------
+
+# 4) Haga un resumen estadistico del tiempo del fractura (si no esta la variable creela)
+
+
+Creo la variable tiempo de fractura
+```{r}
+library(readxl)
+perforaciones <- read_excel("C:/Users/maria/Documents/ITBA MARIA/3 1Q/Analitica Descriptiva/examen2-2s2023/datos_perforaciones.xlsx")
+perforaciones['tiempo_fractura']=perforaciones$fecha_fin_fractura-perforaciones$fecha_inicio_fractura
+#Lo calculo en horas
+perforaciones$tiempo_fractura_horas <- as.numeric(perforaciones$tiempo_fractura) / 3600
+```
+
+# a) indique la duracion media
+
+```{r}
+perforaciones$tiempo_fractura_horas_numeric <- as.numeric(perforaciones$tiempo_fractura_horas)
+media <- summary(perforaciones$tiempo_fractura_horas_numeric)["Mean"]
+```
+Mean:423.8 hrs
+
+# b) el valor maximo y el minimo
+```{r}
+max<-summary(perforaciones$tiempo_fractura_horas_numeric)["Max."]
+min<-summary(perforaciones$tiempo_fractura_horas_numeric)["Min."]
+```
+Max:175848  Min:-8688
+
+# c) si tiene valores negativos o extremos, haga una propuesta de como resolverlo (Outliers)
+
+Hago un histograma y un boxplot para ver si hay outliers
+```{r}
+#Veo cuales son los outliers 
+library(ggplot2)
+ggplot (data= perforaciones)+
+geom_histogram(mapping = aes(x = tiempo_fractura_horas_numeric), binwidth = 5, fill = "darkorchid", color = "darkorchid", ra.nm = TRUE)+coord_cartesian(ylim = c(0, 5))+
+    theme_bw()
+boxplot(perforaciones$tiempo_fractura_horas_numeric)
+```
+
+Propuesta de como resolverlo:
+-Primero voy a eliminar todos los datos con valores negativos usando *FILTER*. Por mas de que se pierdan datos,en la logica ya de base estan errados porque la fecha de fin es previa a la fecha de inicio.Tambien el ultimo outlier extremo que desfigura el maximo, ya que es irreal que un pozo este abierto mas de 20 anios y que todavia siga sirviendo
+
+-Establezco como NA el valor de los puntos que me parecen atipicos 
+
+```{r}
+base_f <- filter(perforaciones, tiempo_fractura_horas_numeric > 0, tiempo_fractura_horas_numeric < 175847)
+boxplot(base_f$tiempo_fractura_horas_numeric)
+#Veo que algunos outliers estan muy cerca de los bigotes entonces deberia agrandar la tolerancia un poco mas
+quantile(base_f$tiempo_fractura_horas_numeric, c(.10,.25,.50,0.75,.90), na.rm=TRUE)
+ric <- quantile(base_f$tiempo_fractura_horas_numeric, 0.75, na.rm = TRUE) - quantile(base_f$tiempo_fractura_horas_numeric, 0.25, na.rm = TRUE)
+limite_inferior<-1-3*ric
+limite_superior<-2+3*ric
+base_f$tiempo_fractura_horas_numeric_clean <-ifelse (base_f$tiempo_fractura_horas_numeric<limite_inferior|base_f$tiempo_fractura_horas_numeric>limite_superior, NA, base_f$tiempo_fractura_horas_numeric)
+
+#Para comparar como influyo veo los dos histogramas a ver la diferencia y podemos notar que en el nuevo esta distribuido de una manera mas uniforme 
+hist(perforaciones$tiempo_fractura_horas_numeric)
+hist(base_f$tiempo_fractura_horas_numeric_clean)
+```
+
+
+# d) Vuelva a hacer una reusmen estadistico
+```{r}
+summary(base_f$tiempo_fractura_horas_numeric_clean)
+```
+Veo que posterior al filter, califique como outliers a 106 casos y los valores maximos y minimos aparentan ser logicos en relacion al tema. 
+

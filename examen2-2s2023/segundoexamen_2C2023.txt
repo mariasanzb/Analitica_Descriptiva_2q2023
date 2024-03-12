@@ -1,0 +1,31 @@
+
+#1) Genere  interrogante que pueda ser contestado con esos datos que vincule:
+    #a) Dos variables numericas
+    #b) Una categorica y una numerica
+    #c) Dos categoricas
+
+#En todos los casos:
+#1.Que las hipotesis planteadas tengan un hilo conductor, sobre el cual se puede llegar a alguna conclusión
+#usando las 3 hipotesis.
+#2.Escriba la hipotesis
+#3.Seleccione el test adecuado e indique por qué lo eligió.
+#4.Realice el test.
+#5.Interpretelo.
+#6.(Opcional) En cada analisis, realice un previo analisis gráfico relevante para adelantar alguna conclusion
+
+#2) Generar las variables "tipo de reservorio" y "subtipo_reservorio" de la columna "tipo_y_subtipo_reservorio",
+# dado que el tipo y subtipo esta divido por el caracter "/"
+
+
+#3) Missings:
+#1) Los faltantes de "subtipo_reservorio", 
+#a)¿dependen de las variables numericas?
+#b)¿dependen de la empresa informante?
+#c) Impute faltantes
+ 
+
+#4) Haga un resumen estadistico del tiempo del fractura (si no esta la variable creela)
+# a) indique la duracion media
+# b) el valor maximo y el minimo
+# c) si tiene valores negativos o extremos, haga una propuesta de como resolverlo (Outliers)
+# d) Vuelva a hacer una reusmen estadistico
